@@ -1,0 +1,2 @@
+# Ledger
+Simple Money Manager
