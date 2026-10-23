@@ -46,6 +46,16 @@
         e.currentTarget.classList.remove('drag-over');
     }
 
+    // Keep the header counts (and the delete-column warning) in sync with the cards on screen
+    function updateColumnCounts() {
+        document.querySelectorAll('.column').forEach((column) => {
+            const count = column.querySelectorAll('.task-card').length;
+            const badge = column.querySelector('.column-header__count');
+            if (badge) badge.textContent = count;
+            column.dataset.taskCount = count;
+        });
+    }
+
     function onDrop(e) {
         e.preventDefault();
         const column = e.currentTarget;
@@ -75,6 +85,7 @@
         } else {
             cards[insertAt].parentNode.insertBefore(taskEl, cards[insertAt]);
         }
+        updateColumnCounts();
 
         // Persist via AJAX
         const updateUrl = updateTaskUrl(taskId);
