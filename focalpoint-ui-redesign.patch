@@ -1,0 +1,1832 @@
+diff --git a/app/context_processors.py b/app/context_processors.py
+new file mode 100644
+index 0000000..e6a9f02
+--- /dev/null
++++ b/app/context_processors.py
+@@ -0,0 +1,8 @@
++from .models import Board
++
++
++def sidebar_boards(request):
++    """Expose the signed-in user's boards to the sidebar on every page."""
++    if not request.user.is_authenticated:
++        return {}
++    return {'sidebar_boards': Board.objects.filter(owner=request.user)}
+diff --git a/app/static/app/css/kanban.css b/app/static/app/css/kanban.css
+index 8d4f895..a1df0d6 100644
+--- a/app/static/app/css/kanban.css
++++ b/app/static/app/css/kanban.css
+@@ -1,17 +1,25 @@
+-/* Focal Point — JIRA-inspired Kanban styles */
++/* Focal Point — sidebar + Kanban styles */
+ 
+ :root {
+-    --jira-blue: #005288;
+-    --jira-blue-dark: #003d66;
+-    --bg: #e6e8ed;
+-    --card: #ffffff;
+-    --border: #dfe2e6;
+-    --text: #172b4d;
+-    --text-muted: #6b778c;
+-    --success: #36b37e;
+-    --warning: #f2a93b;
+-    --danger: #ff5630;
+-    --critical: #bf2600;
++    --bg: #fafafa;
++    --surface: #ffffff;
++    --lane: #f3f4f6;
++    --border: #e5e7eb;
++    --border-strong: #d1d5db;
++    --text: #111827;
++    --text-muted: #6b7280;
++    --primary: #1f6feb;
++    --primary-dark: #1859c4;
++    --primary-soft: #eaf1fe;
++    --radius: 10px;
++    --radius-sm: 7px;
++
++    --low: #16a34a;
++    --medium: #d97706;
++    --high: #ea580c;
++    --critical: #dc2626;
++
++    --sidebar-w: 248px;
+ }
+ 
+ * { box-sizing: border-box; }
+@@ -19,300 +27,592 @@
+ html, body {
+     margin: 0;
+     padding: 0;
++    height: 100%;
+     background: var(--bg);
+     color: var(--text);
+-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
++    font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+     font-size: 14px;
+-    min-height: 100vh;
++    line-height: 1.4;
++    -webkit-font-smoothing: antialiased;
+ }
+ 
+-a { color: var(--jira-blue); text-decoration: none; }
++a { color: var(--primary); text-decoration: none; }
+ a:hover { text-decoration: underline; }
+ 
+-/* Header */
+-.header {
+-    background: var(--jira-blue);
+-    color: #fff;
+-    border-bottom: 1px solid rgba(0,0,0,0.1);
++svg {
++    width: 16px;
++    height: 16px;
++    flex: none;
++    fill: none;
++    stroke: currentColor;
++    stroke-width: 1.6;
++    stroke-linecap: round;
++    stroke-linejoin: round;
++}
++
++:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
++
++.muted { color: var(--text-muted); }
++
++/* ---------- App shell ---------- */
++.app {
++    display: grid;
++    grid-template-columns: var(--sidebar-w) minmax(0, 1fr);
++    height: 100vh;
++}
++
++.app--public { grid-template-columns: minmax(0, 1fr); }
++
++.main {
++    display: flex;
++    flex-direction: column;
++    min-width: 0;
++    height: 100vh;
++}
++
++.content {
++    flex: 1;
++    min-height: 0;
++    padding: 20px 24px;
++    overflow: auto;
+ }
+ 
+-.header-inner {
+-    max-width: 1200px;
+-    margin: 0 auto;
+-    padding: 0 16px;
++.app--public .content {
+     display: flex;
+     align-items: center;
+-    justify-content: space-between;
+-    height: 56px;
++    justify-content: center;
++}
++
++/* ---------- Sidebar ---------- */
++.sidebar {
++    display: flex;
++    flex-direction: column;
++    gap: 16px;
++    padding: 16px 12px;
++    background: var(--surface);
++    border-right: 1px solid var(--border);
++    height: 100vh;
++    overflow-y: auto;
++}
++
++.workspace {
++    display: flex;
++    align-items: center;
++    gap: 10px;
++    padding: 6px 8px;
++    border-radius: var(--radius);
++    color: var(--text);
+ }
+ 
+-.brand {
++.workspace:hover { background: var(--lane); text-decoration: none; }
++.workspace--static:hover { background: none; }
++.workspace--static { padding: 0 0 18px; }
++
++.workspace__logo {
++    display: grid;
++    place-items: center;
++    width: 34px;
++    height: 34px;
++    border-radius: 9px;
++    background: var(--primary);
+     color: #fff;
+-    font-weight: 700;
+-    font-size: 18px;
+-    text-decoration: none;
++    font-weight: 600;
++    font-size: 16px;
+ }
+ 
+-.nav { display: flex; gap: 12px; align-items: center; }
++.workspace__text { display: flex; flex-direction: column; line-height: 1.2; }
++.workspace__name { font-weight: 600; font-size: 14px; }
++.workspace__sub { font-size: 12px; color: var(--text-muted); }
+ 
+-.nav-link {
+-    color: #dfe7ee;
+-    font-size: 14px;
+-    padding: 6px 10px;
+-    border-radius: 3px;
+-    text-decoration: none;
++.side-nav { display: flex; flex-direction: column; gap: 2px; }
++
++.side-link {
++    display: flex;
++    align-items: center;
++    gap: 10px;
++    padding: 7px 10px;
++    border-radius: var(--radius-sm);
++    color: #374151;
++    font-size: 13.5px;
+ }
+ 
+-.nav-link:hover { background: rgba(255,255,255,0.1); color: #fff; text-decoration: none; }
+-.nav-link--create { background: #0079bf; color: #fff; font-weight: 600; }
+-.nav-link--create:hover { background: #0063a8; }
+-.nav-link--logout { background: transparent; border: 1px solid rgba(255,255,255,0.4); color: #fff; cursor: pointer; font: inherit; }
+-.nav-link--logout:hover { background: rgba(255,255,255,0.1); }
++.side-link:hover { background: var(--lane); text-decoration: none; }
++.side-link.is-active { background: var(--primary-soft); color: var(--primary); font-weight: 500; }
++.side-link svg { color: var(--text-muted); }
++.side-link.is-active svg { color: var(--primary); }
+ 
+-/* Layout */
+-.container { max-width: 1400px; margin: 0 auto; padding: 16px; }
++.side-link__label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+ 
+-.page-header {
++.board-dot {
++    width: 8px;
++    height: 8px;
++    margin: 0 4px;
++    border-radius: 50%;
++    background: var(--border-strong);
++    flex: none;
++}
++
++.side-link.is-active .board-dot { background: var(--primary); }
++
++.side-section { display: flex; flex-direction: column; gap: 2px; min-height: 0; }
++
++.side-section__head {
++    padding: 4px 10px 6px;
++    font-size: 12px;
++    font-weight: 500;
++    color: var(--text-muted);
++}
++
++.side-empty { margin: 0; padding: 4px 10px; font-size: 13px; color: var(--text-muted); }
++
++.side-user {
+     display: flex;
+     align-items: center;
+-    justify-content: space-between;
+-    margin-bottom: 16px;
++    gap: 10px;
++    margin-top: auto;
++    padding: 12px 8px 0;
++    border-top: 1px solid var(--border);
++}
++
++.side-user__name {
++    flex: 1;
++    min-width: 0;
++    font-weight: 500;
++    overflow: hidden;
++    text-overflow: ellipsis;
++    white-space: nowrap;
++}
++
++.side-user form { margin: 0; }
++
++.avatar {
++    display: grid;
++    place-items: center;
++    flex: none;
++    width: 30px;
++    height: 30px;
++    border-radius: 50%;
++    background: var(--primary-soft);
++    color: var(--primary);
++    font-size: 12px;
++    font-weight: 600;
+ }
+ 
+-.page-header h1 { font-size: 22px; margin: 0; font-weight: 600; letter-spacing: -0.5px; }
++.avatar--sm { width: 18px; height: 18px; font-size: 10px; }
+ 
+-/* Buttons */
++.scrim { display: none; }
++
++/* ---------- Top bar & toolbar ---------- */
++.topbar {
++    display: flex;
++    align-items: center;
++    gap: 12px;
++    height: 56px;
++    padding: 0 24px;
++    background: var(--surface);
++    border-bottom: 1px solid var(--border);
++}
++
++.topbar__title {
++    display: flex;
++    align-items: center;
++    gap: 8px;
++    margin: 0;
++    font-size: 15px;
++    font-weight: 600;
++    min-width: 0;
++    overflow: hidden;
++    white-space: nowrap;
++    text-overflow: ellipsis;
++}
++
++.crumb { color: var(--text-muted); font-weight: 500; }
++.crumb-sep { color: var(--border-strong); font-weight: 400; }
++
++.topbar__actions { margin-left: auto; display: flex; gap: 8px; align-items: center; }
++
++.icon-btn.menu-btn { display: none; }
++
++.toolbar {
++    display: flex;
++    align-items: center;
++    gap: 8px;
++    padding: 12px 24px;
++    background: var(--surface);
++    border-bottom: 1px solid var(--border);
++}
++
++.search {
++    display: flex;
++    align-items: center;
++    gap: 8px;
++    width: 240px;
++    max-width: 100%;
++    height: 34px;
++    padding: 0 10px;
++    border: 1px solid var(--border);
++    border-radius: var(--radius-sm);
++    background: var(--surface);
++    color: var(--text-muted);
++}
++
++.search:focus-within { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(31,111,235,0.12); }
++
++.search input {
++    flex: 1;
++    min-width: 0;
++    border: 0;
++    outline: 0;
++    background: transparent;
++    font: inherit;
++    color: var(--text);
++}
++
++.select {
++    height: 34px;
++    padding: 0 28px 0 10px;
++    border: 1px solid var(--border);
++    border-radius: var(--radius-sm);
++    background: var(--surface);
++    font: inherit;
++    color: var(--text);
++    cursor: pointer;
++}
++
++/* ---------- Buttons ---------- */
+ .btn {
+-    display: inline-block;
+-    padding: 6px 14px;
++    display: inline-flex;
++    align-items: center;
++    justify-content: center;
++    gap: 6px;
++    height: 34px;
++    padding: 0 14px;
+     border: 1px solid var(--border);
+-    border-radius: 3px;
+-    background: var(--card);
++    border-radius: var(--radius-sm);
++    background: var(--surface);
+     color: var(--text);
+     font: inherit;
+-    font-size: 14px;
++    font-weight: 500;
+     cursor: pointer;
+-    text-decoration: none;
+ }
+ 
+-.btn:hover { background: #f4f5f7; border-color: #c7ccd4; }
++.btn:hover { background: var(--lane); text-decoration: none; }
++
++.btn--primary { background: var(--primary); border-color: var(--primary); color: #fff; }
++.btn--primary:hover { background: var(--primary-dark); border-color: var(--primary-dark); }
++
++.btn--block { width: 100%; }
++
++.icon-btn {
++    display: inline-grid;
++    place-items: center;
++    width: 28px;
++    height: 28px;
++    padding: 0;
++    border: 0;
++    border-radius: 6px;
++    background: transparent;
++    color: var(--text-muted);
++    cursor: pointer;
++}
+ 
+-.btn--primary { background: var(--jira-blue); border-color: var(--jira-blue); color: #fff; }
+-.btn--primary:hover { background: var(--jira-blue-dark); border-color: var(--jira-blue-dark); }
++.icon-btn:hover { background: var(--lane); color: var(--text); }
+ 
+-.btn--ghost { background: transparent; border-color: transparent; color: var(--text-muted); }
+-.btn--ghost:hover { background: #f4f5f7; color: var(--text); }
++/* ---------- Forms & panels ---------- */
++.panel {
++    width: 100%;
++    padding: 24px;
++    background: var(--surface);
++    border: 1px solid var(--border);
++    border-radius: 12px;
++}
+ 
+-.btn--small { padding: 2px 8px; font-size: 12px; }
++.panel--narrow { max-width: 420px; }
++.app:not(.app--public) .panel--narrow { margin: 0; }
+ 
+-/* Forms */
+-.form { max-width: 460px; }
+-.form--narrow { max-width: 360px; }
++.panel__title { margin: 0 0 16px; font-size: 18px; font-weight: 600; }
+ 
+-.form-field { margin-bottom: 14px; }
++.form-field { margin-bottom: 14px; flex: 1; }
+ 
+ .form-field label {
+     display: block;
+-    margin-bottom: 4px;
++    margin-bottom: 5px;
+     font-size: 13px;
+-    font-weight: 600;
+-    color: var(--text-muted);
++    font-weight: 500;
++    color: #374151;
+ }
+ 
+ .form-field input,
+ .form-field select,
+ .form-field textarea {
+     width: 100%;
+-    padding: 7px 10px;
+-    border: 1px solid var(--border);
+-    border-radius: 3px;
++    padding: 8px 10px;
++    border: 1px solid var(--border-strong);
++    border-radius: var(--radius-sm);
+     background: #fff;
+     font: inherit;
+-    font-size: 14px;
++    color: var(--text);
+ }
+ 
++.form-field textarea { resize: vertical; }
++
+ .form-field input:focus,
+ .form-field select:focus,
+ .form-field textarea:focus {
+     outline: none;
+-    border-color: var(--jira-blue);
+-    box-shadow: 0 0 0 2px rgba(0,82,136,0.15);
++    border-color: var(--primary);
++    box-shadow: 0 0 0 3px rgba(31,111,235,0.14);
+ }
+ 
++.form-row { display: flex; gap: 12px; }
+ .form-actions { display: flex; gap: 8px; margin-top: 8px; }
++.form-actions--end { justify-content: flex-end; }
+ 
+-/* Messages */
+ .messages { margin-bottom: 12px; }
++
+ .message {
+-    padding: 8px 12px;
+-    border-radius: 3px;
++    padding: 9px 12px;
++    border-radius: var(--radius-sm);
+     font-size: 13px;
+-    margin-bottom: 6px;
++    margin-bottom: 12px;
+ }
+-.message.error { background: #fdecea; color: #bf2600; border: 1px solid #f7c6c3; }
++
++.message.error { background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; }
+ 
+ .empty-state {
++    display: flex;
++    flex-direction: column;
++    align-items: center;
++    gap: 12px;
++    padding: 64px 24px;
+     color: var(--text-muted);
+-    font-size: 14px;
+-    padding: 24px;
+     text-align: center;
+ }
+ 
+-/* Boards list */
+-.board-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; }
++.empty-state p { margin: 0; }
++
++/* ---------- Board list ---------- */
++.board-list {
++    display: grid;
++    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
++    gap: 16px;
++}
+ 
+ .board-card {
+-    background: var(--card);
+-    border: 1px solid var(--border);
+-    border-radius: 4px;
++    display: block;
+     padding: 16px;
+-    display: flex;
+-    flex-direction: column;
++    background: var(--surface);
++    border: 1px solid var(--border);
++    border-radius: var(--radius);
++    color: inherit;
+ }
+ 
+-.board-card__link { color: inherit; text-decoration: none; }
+-.board-card__link:hover { text-decoration: underline; }
+-
+-.board-card__title { margin: 0 0 8px 0; font-size: 18px; font-weight: 600; }
+-.board-card__meta { font-size: 12px; color: var(--text-muted); }
+-
+-/* Kanban board */
+-.board-header {
+-    display: flex;
+-    align-items: center;
+-    justify-content: space-between;
+-    margin-bottom: 16px;
+-    flex-wrap: wrap;
+-    gap: 12px;
++.board-card:hover { border-color: var(--primary); text-decoration: none; }
++
++.board-card__icon {
++    display: grid;
++    place-items: center;
++    width: 32px;
++    height: 32px;
++    margin-bottom: 14px;
++    border-radius: 8px;
++    background: var(--primary-soft);
++    color: var(--primary);
+ }
+ 
+-.board-header h1 { margin: 0; font-size: 20px; font-weight: 600; }
++.board-card__title { margin: 0 0 4px; font-size: 15px; font-weight: 600; }
++.board-card__meta { font-size: 12.5px; color: var(--text-muted); }
++
++/* ---------- Kanban ---------- */
++.app:has(.kanban) .content { padding: 16px 24px 0; overflow: hidden; display: flex; }
+ 
+ .kanban {
+     display: flex;
+     flex-direction: row;
+-    gap: 16px;
+-    overflow-x: auto;
++    align-items: stretch;
++    gap: 12px;
++    flex: 1;
++    min-width: 0;
+     padding-bottom: 16px;
++    overflow-x: auto;
+     scrollbar-width: thin;
+ }
+ 
+ .column {
+-    flex: 0 0 auto;
+-    width: 300px;
+-    min-width: 260px;
+-    background: var(--bg);
+-    border-radius: 4px;
++    flex: 1 1 272px;
++    min-width: 272px;
++    max-width: 360px;
+     display: flex;
+     flex-direction: column;
+-    height: calc(100vh - 160px);
++    min-height: 0;
++    padding: 10px;
++    background: var(--lane);
++    border-radius: 12px;
++    border: 1px solid transparent;
+ }
+ 
+-.column.drag-over { background: #cfe0ee; }
++.column.drag-over { background: var(--primary-soft); border-color: #bcd3fa; }
+ 
+ .column-header {
+-    padding: 8px 12px;
+-    border-radius: 4px 4px 0 0;
+-    color: #172b4d;
+-    font-weight: 700;
+-    font-size: 15px;
+     display: flex;
+     align-items: center;
+-    justify-content: space-between;
++    gap: 8px;
++    padding: 2px 2px 10px;
+     user-select: none;
+ }
+ 
+-.column-header__count {
+-    font-size: 12px;
+-    font-weight: 400;
+-    opacity: 0.9;
+-    background: rgba(255,255,255,0.2);
+-    padding: 1px 6px;
+-    border-radius: 10px;
+-    margin-left: 8px;
++.stage-badge {
++    padding: 2px 10px;
++    border-radius: 6px;
++    color: #1f2937;
++    font-size: 13px;
++    font-weight: 500;
++    line-height: 1.5;
++}
++
++.column-header__count { font-size: 13px; color: var(--text-muted); }
++.column-header__actions {
++    display: flex;
++    align-items: center;
++    gap: 2px;
++    margin-left: auto;
+ }
+ 
++.column-header__actions .icon-btn:first-child { opacity: 0; }
++.column:hover .column-header__actions .icon-btn:first-child,
++.column:focus-within .column-header__actions .icon-btn:first-child { opacity: 1; }
++
+ .column-body {
+     flex: 1;
+-    overflow-y: auto;
+-    padding: 8px 4px 4px;
++    min-height: 60px;
+     display: flex;
+     flex-direction: column;
+     gap: 8px;
++    overflow-y: auto;
++    scrollbar-width: thin;
+ }
+ 
+ .empty-col {
+-    padding: 8px;
+-    font-size: 12px;
++    padding: 14px 8px;
++    border: 1px dashed var(--border-strong);
++    border-radius: var(--radius);
++    font-size: 13px;
+     color: var(--text-muted);
+     text-align: center;
+ }
+ 
+-/* Task cards */
++.column-body:has(.task-card:not([hidden])) .empty-col { display: none; }
++
++/* Add-column lane at the end of the board */
++.add-column {
++    flex: 0 0 200px;
++    align-self: flex-start;
++    display: flex;
++    align-items: center;
++    justify-content: center;
++    gap: 8px;
++    height: 44px;
++    border: 1px dashed var(--border-strong);
++    border-radius: 12px;
++    background: transparent;
++    color: var(--text-muted);
++    font: inherit;
++    font-weight: 500;
++    cursor: pointer;
++}
++
++.add-column:hover { background: var(--lane); color: var(--text); border-color: var(--text-muted); }
++
++/* ---------- Task cards ---------- */
+ .task-card {
+-    background: var(--card);
++    display: flex;
++    flex-direction: column;
++    align-items: flex-start;
++    gap: 8px;
++    padding: 12px;
++    background: var(--surface);
+     border: 1px solid var(--border);
+-    border-radius: 4px;
+-    padding: 10px 12px;
++    border-radius: var(--radius);
+     cursor: grab;
+-    box-shadow: 0 1px 2px rgba(0,0,0,0.06);
+     user-select: none;
+ }
+ 
++.task-card:hover { border-color: var(--border-strong); }
+ .task-card:active { cursor: grabbing; }
++.task-card.dragging { opacity: 0.45; border-color: var(--primary); }
++.task-card[hidden] { display: none; }
+ 
+-.task-card.dragging { opacity: 0.5; border-color: var(--jira-blue); }
+-
+-.task-card__content { margin-bottom: 6px; }
++.task-card__top { display: flex; align-items: flex-start; gap: 4px; width: 100%; }
++.task-card__actions { display: flex; margin: -4px -6px 0 0; }
++.task-card__actions form { margin: 0; }
+ 
+ .task-card__title {
++    flex: 1;
++    min-width: 0;
++    margin: 0;
+     font-size: 14px;
+     font-weight: 600;
+-    margin: 0 0 4px 0;
+-    white-space: nowrap;
+-    overflow: hidden;
+-    text-overflow: ellipsis;
+-    color: var(--text);
++    line-height: 1.35;
++    overflow-wrap: anywhere;
+ }
+ 
++.task-card__btn { width: 24px; height: 24px; opacity: 0; }
++.task-card__btn svg { width: 14px; height: 14px; }
++.task-card:hover .task-card__btn,
++.task-card:focus-within .task-card__btn { opacity: 1; }
++.task-card__delete:hover { color: var(--critical); background: #fef2f2; }
++
+ .task-card__desc {
+-    font-size: 12px;
++    margin: 0;
++    font-size: 12.5px;
+     color: var(--text-muted);
+-    margin: 0 0 6px 0;
+-    line-height: 1.4;
++    line-height: 1.45;
+     display: -webkit-box;
+     -webkit-line-clamp: 2;
+     -webkit-box-orient: vertical;
+     overflow: hidden;
+ }
+ 
+-.task-card__footer { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+-
+-.priority {
+-    font-size: 11px;
+-    font-weight: 700;
+-    padding: 1px 6px;
+-    border-radius: 3px;
+-    text-transform: uppercase;
+-    letter-spacing: 0.4px;
++.task-card__meta {
++    display: flex;
++    align-items: center;
++    gap: 6px;
++    font-size: 12.5px;
++    color: var(--text-muted);
+ }
+ 
+-.priority--low { color: var(--success); border: 1px solid var(--success); }
+-.priority--medium { color: var(--warning); border: 1px solid var(--warning); }
+-.priority--high { color: var(--danger); border: 1px solid var(--danger); }
+-.priority--critical { color: var(--critical); border: 1px solid var(--critical); }
++.meta-sep { width: 3px; height: 3px; border-radius: 50%; background: var(--border-strong); }
+ 
+-.assignee {
+-    font-size: 11px;
+-    color: var(--text-muted);
+-    background: #f4f5f7;
+-    padding: 1px 6px;
+-    border-radius: 3px;
++/* Priority tag with level bars */
++.tag {
++    display: inline-flex;
++    align-items: center;
++    gap: 7px;
++    padding: 3px 9px 3px 8px;
++    border: 1px solid var(--border);
++    border-radius: 6px;
++    font-size: 12.5px;
++    color: #374151;
+ }
+ 
+-.task-card__actions { display: flex; justify-content: flex-end; }
++.bars { display: inline-flex; align-items: flex-end; gap: 2px; height: 11px; }
++.bars i { width: 3px; border-radius: 1px; background: var(--border-strong); }
++.bars i:nth-child(1) { height: 4px; }
++.bars i:nth-child(2) { height: 6px; }
++.bars i:nth-child(3) { height: 8px; }
++.bars i:nth-child(4) { height: 11px; }
+ 
+-/* Modal */
++.tag--low { --tone: var(--low); }
++.tag--medium { --tone: var(--medium); }
++.tag--high { --tone: var(--high); }
++.tag--critical { --tone: var(--critical); }
++
++.tag--low .bars i:nth-child(-n+1),
++.tag--medium .bars i:nth-child(-n+2),
++.tag--high .bars i:nth-child(-n+3),
++.tag--critical .bars i:nth-child(-n+4) { background: var(--tone); }
++
++/* ---------- Modal ---------- */
+ .modal {
+     position: fixed;
+     inset: 0;
+@@ -322,20 +622,16 @@ a:hover { text-decoration: underline; }
+     z-index: 50;
+ }
+ 
+-.modal-backdrop {
+-    position: absolute;
+-    inset: 0;
+-    background: rgba(0,0,0,0.3);
+-}
++.modal-backdrop { position: absolute; inset: 0; background: rgba(17,24,39,0.4); }
+ 
+ .modal-panel {
+     position: relative;
+-    width: 90%;
+-    max-width: 460px;
++    width: 92%;
++    max-width: 480px;
+     max-height: 90vh;
+-    background: var(--card);
+-    border-radius: 4px;
+-    box-shadow: 0 8px 24px rgba(0,0,0,0.2);
++    background: var(--surface);
++    border-radius: 14px;
++    box-shadow: 0 20px 50px rgba(17,24,39,0.25);
+     overflow-y: auto;
+ }
+ 
+@@ -343,15 +639,80 @@ a:hover { text-decoration: underline; }
+     display: flex;
+     align-items: center;
+     justify-content: space-between;
+-    padding: 12px 16px;
++    padding: 14px 16px 14px 20px;
+     border-bottom: 1px solid var(--border);
+ }
+ 
+ .modal-header h3 { margin: 0; font-size: 16px; font-weight: 600; }
++.modal-form { padding: 20px; }
++
++/* Dialog extras */
++.modal-panel--small { max-width: 400px; }
++
++.field-label {
++    display: block;
++    margin-bottom: 8px;
++    font-size: 13px;
++    font-weight: 500;
++    color: #374151;
++}
++
++.swatches { display: flex; flex-wrap: wrap; gap: 10px; }
++
++.swatch { position: relative; cursor: pointer; }
++.swatch input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
++
++.swatch span {
++    display: block;
++    width: 28px;
++    height: 28px;
++    border-radius: 8px;
++    border: 1px solid rgba(17,24,39,0.12);
++}
++
++.swatch input:checked + span { box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--primary); }
++.swatch input:focus-visible + span { outline: 2px solid var(--primary); outline-offset: 4px; }
++
++.modal-footer { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 8px; }
++.modal-footer .form-actions { margin: 0; margin-left: auto; }
++
++.btn--danger { color: var(--critical); border-color: #fecaca; }
++.btn--danger:hover { background: #fef2f2; border-color: #fca5a5; }
++.btn[hidden] { display: none; }
++
++.empty-state strong { color: var(--text); font-weight: 600; }
++.empty-state p { max-width: 380px; }
++
++/* ---------- Narrow screens ---------- */
++@media (max-width: 860px) {
++    .app { grid-template-columns: minmax(0, 1fr); }
++
++    .sidebar {
++        position: fixed;
++        inset: 0 auto 0 0;
++        width: var(--sidebar-w);
++        z-index: 40;
++        transform: translateX(-100%);
++        transition: transform 0.2s ease;
++    }
++
++    .app.sidebar-open .sidebar { transform: none; box-shadow: 0 0 40px rgba(17,24,39,0.2); }
++
++    .app.sidebar-open .scrim {
++        display: block;
++        position: fixed;
++        inset: 0;
++        z-index: 30;
++        background: rgba(17,24,39,0.35);
++    }
++
++    .icon-btn.menu-btn { display: inline-grid; margin-left: -6px; }
++    .topbar, .toolbar { padding-left: 16px; padding-right: 16px; }
++    .content, .app:has(.kanban) .content { padding-left: 16px; padding-right: 16px; }
++    .form-row { flex-direction: column; gap: 0; }
++    .search { flex: 1; width: auto; }
++}
+ 
+-/* Responsive: stack columns vertically on narrow screens */
+-@media (max-width: 768px) {
+-    .kanban { flex-direction: column; overflow-x: hidden; height: auto; min-height: auto; }
+-    .column { width: 100%; min-width: auto; height: auto; max-height: 60vh; }
+-    .container { padding: 12px; }
++@media (prefers-reduced-motion: reduce) {
++    .sidebar { transition: none; }
+ }
+diff --git a/app/static/app/js/kanban.js b/app/static/app/js/kanban.js
+index fa3ad55..72eb709 100644
+--- a/app/static/app/js/kanban.js
++++ b/app/static/app/js/kanban.js
+@@ -1,4 +1,4 @@
+-/* Focal Point — Kanban drag-and-drop + task creation (single source of truth) */
++/* Focal Point — Kanban drag-and-drop, task creation, filters, mobile menu */
+ 
+ (function () {
+     let draggedTaskId = null;
+@@ -112,25 +112,122 @@
+         });
+     }
+ 
++    function setTaskModal(mode) {
++        const editing = mode === 'edit';
++        document.getElementById('task-modal-title').textContent = editing ? 'Edit task' : 'Create task';
++        document.getElementById('task-submit').textContent = editing ? 'Save changes' : 'Create task';
++    }
++
++    function showTaskModal() {
++        document.getElementById('task-modal').style.display = 'flex';
++        document.getElementById('modal-title').focus();
++    }
++
+     function openTaskModal(columnId) {
++        const form = document.getElementById('task-form');
++        form.reset();
++        form.action = form.dataset.createAction;
++        const select = document.getElementById('modal-column');
++        const firstColumn = document.querySelector('.column');
++        select.value = columnId || (firstColumn ? firstColumn.dataset.columnId : '');
++        setTaskModal('create');
++        showTaskModal();
++    }
++
++    function openTaskEdit(card) {
++        const board = document.querySelector('.kanban');
++        const form = document.getElementById('task-form');
++        form.reset();
++        form.action = board.dataset.taskEditUrl.replace('/0/', `/${card.dataset.taskId}/`);
++        document.getElementById('modal-title').value = card.dataset.title;
++        document.getElementById('modal-desc').value = card.dataset.description;
++        document.getElementById('modal-priority').value = card.dataset.priority;
++        document.getElementById('modal-assignee').value = card.dataset.assignee;
++        document.getElementById('modal-column').value = card.closest('.column').dataset.columnId;
++        setTaskModal('edit');
++        showTaskModal();
++    }
++
++    function closeTaskModal() {
+         const modal = document.getElementById('task-modal');
+-        const input = document.getElementById('modal-column');
++        if (modal) modal.style.display = 'none';
++    }
++
++    function openColumnModal(columnId) {
++        const form = document.getElementById('column-form');
++        const del = document.getElementById('column-delete');
++        const delForm = document.getElementById('column-delete-form');
++        form.reset();
++        // Drop a stray swatch added for a previous column's custom colour
++        form.querySelectorAll('.swatch--custom').forEach((el) => el.remove());
++
+         if (columnId) {
+-            input.value = columnId;
++            const board = document.querySelector('.kanban');
++            const column = document.querySelector(`.column[data-column-id="${columnId}"]`);
++            form.action = board.dataset.columnEditUrl.replace('/0/', `/${columnId}/`);
++            document.getElementById('column-name').value = column.dataset.columnName;
++
++            // Columns made before colour swatches existed may use a colour not in the palette
++            const color = column.dataset.columnColor;
++            let radio = Array.from(form.querySelectorAll('input[name="color"]')).find(
++                (r) => r.value.toLowerCase() === color.toLowerCase()
++            );
++            if (!radio) {
++                const label = document.createElement('label');
++                label.className = 'swatch swatch--custom';
++                label.title = 'Current color';
++                label.innerHTML = '<input type="radio" name="color"><span></span>';
++                radio = label.querySelector('input');
++                radio.value = color;
++                label.querySelector('span').style.backgroundColor = color;
++                form.querySelector('.swatches').prepend(label);
++            }
++            radio.checked = true;
++
++            delForm.action = board.dataset.columnDeleteUrl.replace('/0/', `/${columnId}/`);
++            const count = parseInt(column.dataset.taskCount, 10) || 0;
++            delForm.dataset.confirm = count
++                ? `Delete "${column.dataset.columnName}" and its ${count} task${count === 1 ? '' : 's'}?`
++                : `Delete "${column.dataset.columnName}"?`;
++            del.hidden = false;
++            document.getElementById('column-modal-title').textContent = 'Edit column';
++            document.getElementById('column-submit').textContent = 'Save changes';
+         } else {
+-            const firstColumn = document.querySelector('.column');
+-            input.value = firstColumn ? firstColumn.dataset.columnId : '';
++            form.action = form.dataset.createAction;
++            del.hidden = true;
++            document.getElementById('column-modal-title').textContent = 'Add column';
++            document.getElementById('column-submit').textContent = 'Add column';
+         }
+-        modal.style.display = 'flex';
++        document.getElementById('column-modal').style.display = 'flex';
++        document.getElementById('column-name').focus();
+     }
+ 
+-    function closeTaskModal() {
+-        document.getElementById('task-modal').style.display = 'none';
++    function closeColumnModal() {
++        const modal = document.getElementById('column-modal');
++        if (modal) modal.style.display = 'none';
++    }
++
++    // Confirm before a column (and its tasks) is deleted
++    const columnDeleteForm = document.getElementById('column-delete-form');
++    if (columnDeleteForm) {
++        columnDeleteForm.addEventListener('submit', (e) => {
++            if (!confirm(columnDeleteForm.dataset.confirm || 'Delete this column?')) e.preventDefault();
++        });
+     }
+ 
++    // Clicking a card (not its buttons) opens it for editing
++    document.addEventListener('click', (e) => {
++        const card = e.target.closest('.task-card');
++        if (!card || e.target.closest('button, form, a')) return;
++        openTaskEdit(card);
++    });
++
+     // Expose for inline onclick handlers in templates
+     window.openTaskModal = openTaskModal;
++    window.openTaskEdit = openTaskEdit;
+     window.closeTaskModal = closeTaskModal;
++    window.openColumnModal = openColumnModal;
++    window.closeColumnModal = closeColumnModal;
+ 
+     // Clicking outside the panel closes the modal
+     const modal = document.getElementById('task-modal');
+@@ -140,11 +237,52 @@
+         });
+     }
+ 
++    // Client-side search + priority filter
++    function setupFilters() {
++        const search = document.getElementById('task-search');
++        const priority = document.getElementById('priority-filter');
++        if (!search || !priority) return;
++
++        function apply() {
++            const q = search.value.trim().toLowerCase();
++            const p = priority.value;
++            document.querySelectorAll('.task-card').forEach((card) => {
++                const matchesText = !q || card.textContent.toLowerCase().includes(q);
++                const matchesPriority = !p || card.dataset.priority === p;
++                card.hidden = !(matchesText && matchesPriority);
++            });
++        }
++        search.addEventListener('input', apply);
++        priority.addEventListener('change', apply);
++    }
++
++    // Sidebar toggle on narrow screens
++    function setupMenu() {
++        const app = document.getElementById('app');
++        const btn = document.getElementById('menu-btn');
++        const scrim = document.getElementById('scrim');
++        if (!app || !btn) return;
++        btn.addEventListener('click', () => app.classList.toggle('sidebar-open'));
++        if (scrim) scrim.addEventListener('click', () => app.classList.remove('sidebar-open'));
++    }
++
++    // Escape closes whichever dialog is open
++    document.addEventListener('keydown', (e) => {
++        if (e.key !== 'Escape') return;
++        closeTaskModal();
++        closeColumnModal();
++    });
++
+     // Wire up drag-and-drop once the DOM is ready
++    function init() {
++        attachDragDrop();
++        setupFilters();
++        setupMenu();
++    }
+     if (document.readyState === 'loading') {
+-        document.addEventListener('DOMContentLoaded', attachDragDrop);
++        document.addEventListener('DOMContentLoaded', init);
+     } else {
+-        attachDragDrop();
++        init();
+     }
+     // Re-wire after any dynamic re-render (e.g. new task added)
+     window.__focalpointAttachDragDrop = attachDragDrop;
+diff --git a/app/templates/app/base.html b/app/templates/app/base.html
+index 1fe056e..bcdebf8 100644
+--- a/app/templates/app/base.html
++++ b/app/templates/app/base.html
+@@ -5,40 +5,87 @@
+     <meta charset="utf-8">
+     <meta name="viewport" content="width=device-width, initial-scale=1">
+     <title>{% block title %}Focal Point{% endblock %}</title>
++    <link rel="preconnect" href="https://fonts.googleapis.com">
++    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
++    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap">
+     <link rel="stylesheet" href="{% static 'app/css/kanban.css' %}">
+     {% block extra_css %}{% endblock %}
+ </head>
+ <body>
+-    <header class="header">
+-        <div class="header-inner">
+-            <a href="{% url 'board-list' %}" class="brand">Focal Point</a>
+-            <nav class="nav">
+-                {% if user.is_authenticated %}
+-                    <a href="{% url 'board-list' %}" class="nav-link">Boards</a>
+-                    <a href="{% url 'board-create' %}" class="nav-link nav-link--create">Create Board</a>
+-                    <form action="{% url 'logout' %}" method="post" style="display:inline;">
+-                        {% csrf_token %}
+-                        <button type="submit" class="nav-link nav-link--logout">Log out {{ user.username }}</button>
+-                    </form>
+-                {% else %}
+-                    <a href="{% url 'login' %}" class="nav-link">Log in</a>
+-                {% endif %}
+-            </nav>
++<div class="app{% if not user.is_authenticated %} app--public{% endif %}" id="app">
++    {% if user.is_authenticated %}
++    <aside class="sidebar" id="sidebar">
++        <a href="{% url 'board-list' %}" class="workspace">
++            <span class="workspace__logo">F</span>
++            <span class="workspace__text">
++                <span class="workspace__name">Focal Point</span>
++                <span class="workspace__sub">Task management</span>
++            </span>
++        </a>
++
++        <nav class="side-nav" aria-label="Main">
++            <a href="{% url 'board-list' %}" class="side-link{% if request.resolver_match.url_name == 'board-list' %} is-active{% endif %}">
++                <svg viewBox="0 0 20 20" aria-hidden="true"><rect x="3" y="3" width="6" height="14" rx="1.5"/><rect x="11" y="3" width="6" height="9" rx="1.5"/></svg>
++                All boards
++            </a>
++            <a href="{% url 'board-create' %}" class="side-link{% if request.resolver_match.url_name == 'board-create' %} is-active{% endif %}">
++                <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 4v12M4 10h12"/></svg>
++                Create board
++            </a>
++        </nav>
++
++        <div class="side-section">
++            <div class="side-section__head">Your boards</div>
++            {% for b in sidebar_boards %}
++                <a href="{% url 'board-detail' b.pk %}" class="side-link side-link--board{% if board and board.pk == b.pk %} is-active{% endif %}">
++                    <span class="board-dot" aria-hidden="true"></span>
++                    <span class="side-link__label">{{ b.name }}</span>
++                </a>
++            {% empty %}
++                <p class="side-empty">No boards yet</p>
++            {% endfor %}
+         </div>
+-    </header>
+ 
+-    <main class="container">
+-        {% if messages %}
+-            <div class="messages">
+-                {% for message in messages %}
+-                    <div class="message {{ message.tags }}">{{ message }}</div>
+-                {% endfor %}
+-            </div>
++        <div class="side-user">
++            <span class="avatar">{{ user.username|first|upper }}</span>
++            <span class="side-user__name">{{ user.username }}</span>
++            <form action="{% url 'logout' %}" method="post">
++                {% csrf_token %}
++                <button type="submit" class="icon-btn" title="Log out" aria-label="Log out">
++                    <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M8 4H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3M12 7l3 3-3 3M7 10h8"/></svg>
++                </button>
++            </form>
++        </div>
++    </aside>
++    <div class="scrim" id="scrim"></div>
++    {% endif %}
++
++    <div class="main">
++        {% if user.is_authenticated %}
++        <header class="topbar">
++            <button type="button" class="icon-btn menu-btn" id="menu-btn" aria-label="Open menu">
++                <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 6h14M3 10h14M3 14h14"/></svg>
++            </button>
++            <h1 class="topbar__title">{% block page_title %}Focal Point{% endblock %}</h1>
++            <div class="topbar__actions">{% block topbar_actions %}{% endblock %}</div>
++        </header>
++        {% block toolbar %}{% endblock %}
+         {% endif %}
+-        {% block content %}{% endblock %}
+-    </main>
+ 
+-    <script src="{% static 'app/js/kanban.js' %}"></script>
+-    {% block scripts %}{% endblock %}
++        <main class="content">
++            {% if messages %}
++                <div class="messages">
++                    {% for message in messages %}
++                        <div class="message {{ message.tags }}">{{ message }}</div>
++                    {% endfor %}
++                </div>
++            {% endif %}
++            {% block content %}{% endblock %}
++        </main>
++    </div>
++</div>
++
++<script src="{% static 'app/js/kanban.js' %}"></script>
++{% block scripts %}{% endblock %}
+ </body>
+ </html>
+diff --git a/app/templates/app/board_create.html b/app/templates/app/board_create.html
+index f5ff00b..fef1ead 100644
+--- a/app/templates/app/board_create.html
++++ b/app/templates/app/board_create.html
+@@ -1,23 +1,26 @@
+ {% extends 'app/base.html' %}
+ 
+ {% block title %}Create Board - Focal Point{% endblock %}
++{% block page_title %}<a href="{% url 'board-list' %}" class="crumb">Boards</a><span class="crumb-sep">/</span>New board{% endblock %}
+ 
+ {% block content %}
+-    <div class="page-header"><h1>Create board</h1></div>
++    <div class="panel panel--narrow">
++        <h2 class="panel__title">Create board</h2>
+ 
+-    {% if error %}
+-        <div class="message error">{{ error }}</div>
+-    {% endif %}
++        {% if error %}
++            <div class="message error">{{ error }}</div>
++        {% endif %}
+ 
+-    <form method="post" class="form form--narrow" novalidate>
+-        {% csrf_token %}
+-        <div class="form-field">
+-            <label for="name">Board name</label>
+-            <input type="text" id="name" name="name" maxlength="200" required autofocus placeholder="e.g. Sprint 1">
+-        </div>
+-        <div class="form-actions">
+-            <button type="submit" class="btn btn--primary">Create board</button>
+-            <a href="{% url 'board-list' %}" class="btn btn--ghost">Cancel</a>
+-        </div>
+-    </form>
++        <form method="post" class="form" novalidate>
++            {% csrf_token %}
++            <div class="form-field">
++                <label for="name">Board name</label>
++                <input type="text" id="name" name="name" maxlength="200" required autofocus placeholder="e.g. Sprint 1">
++            </div>
++            <div class="form-actions">
++                <button type="submit" class="btn btn--primary">Create board</button>
++                <a href="{% url 'board-list' %}" class="btn">Cancel</a>
++            </div>
++        </form>
++    </div>
+ {% endblock %}
+diff --git a/app/templates/app/board_detail.html b/app/templates/app/board_detail.html
+index 97e7079..58595a7 100644
+--- a/app/templates/app/board_detail.html
++++ b/app/templates/app/board_detail.html
+@@ -1,100 +1,200 @@
+ {% extends 'app/base.html' %}
+ 
+ {% block title %}{{ board.name }} - Focal Point{% endblock %}
++{% block page_title %}<a href="{% url 'board-list' %}" class="crumb">Boards</a><span class="crumb-sep">/</span>{{ board.name }}{% endblock %}
+ 
+-{% block content %}
+-    <div class="board-header">
+-        <div class="board-header__left">
+-            <a href="{% url 'board-list' %}" class="btn btn--ghost">&larr; All boards</a>
+-            <h1>{{ board.name }}</h1>
+-        </div>
+-        <div class="board-header__right">
+-            <button type="button" class="btn btn--primary" onclick="openTaskModal()">Add task</button>
+-        </div>
++{% block topbar_actions %}
++    <button type="button" class="btn" onclick="openColumnModal()">Add column</button>
++    {% if columns %}
++        <button type="button" class="btn btn--primary" onclick="openTaskModal()">Add task</button>
++    {% endif %}
++{% endblock %}
++
++{% block toolbar %}
++    {% if columns %}
++    <div class="toolbar">
++        <label class="search">
++            <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="9" cy="9" r="5"/><path d="m13 13 4 4"/></svg>
++            <input type="search" id="task-search" placeholder="Search tasks" autocomplete="off">
++        </label>
++        <select id="priority-filter" class="select" aria-label="Filter by priority">
++            <option value="">All priorities</option>
++            <option value="low">Low</option>
++            <option value="medium">Medium</option>
++            <option value="high">High</option>
++            <option value="critical">Critical</option>
++        </select>
+     </div>
++    {% endif %}
++{% endblock %}
+ 
+-    <div class="kanban" data-task-update-url="{% url 'task-update' 0 %}">
++{% block content %}
++    {% if columns %}
++    <div class="kanban"
++         data-task-update-url="{% url 'task-update' 0 %}"
++         data-task-edit-url="{% url 'task-edit' 0 %}"
++         data-column-edit-url="{% url 'column-edit' 0 %}"
++         data-column-delete-url="{% url 'column-delete' 0 %}">
+         {% for column in columns %}
+-            <div class="column" data-column-id="{{ column.pk }}">
+-                <div class="column-header" style="background-color: {{ column.color }};">
+-                    <div class="column-header__title">{{ column.name }}</div>
++            <section class="column" data-column-id="{{ column.pk }}" data-column-name="{{ column.name }}" data-column-color="{{ column.color }}" data-task-count="{{ column.tasks.count }}">
++                <div class="column-header">
++                    <span class="stage-badge" style="background-color: {{ column.color }};">{{ column.name }}</span>
+                     <span class="column-header__count">{{ column.tasks.count }}</span>
++                    <span class="column-header__actions">
++                        <button type="button" class="icon-btn" onclick="openColumnModal({{ column.pk }})" title="Edit column" aria-label="Edit column {{ column.name }}">
++                            <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 16h3l8-8-3-3-8 8v3ZM11 6l3 3"/></svg>
++                        </button>
++                        <button type="button" class="icon-btn" onclick="openTaskModal({{ column.pk }})" title="Add task to {{ column.name }}" aria-label="Add task to {{ column.name }}">
++                            <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 4v12M4 10h12"/></svg>
++                        </button>
++                    </span>
+                 </div>
+                 <div class="column-body">
+                     {% for task in column.tasks.all %}
+-                        <div class="task-card draggable" data-task-id="{{ task.pk }}">
+-                            <div class="task-card__content">
+-                                <div class="task-card__title">{{ task.title }}</div>
+-                                {% if task.description %}
+-                                    <div class="task-card__desc">{{ task.description|truncatewords:15 }}</div>
+-                                {% endif %}
+-                                <div class="task-card__footer">
+-                                    <span class="priority priority--{{ task.priority }}">{{ task.get_priority_display }}</span>
+-                                    {% if task.assignee %}
+-                                        <span class="assignee">@{{ task.assignee.username }}</span>
+-                                    {% endif %}
+-                                </div>
++                        <article class="task-card draggable" data-task-id="{{ task.pk }}" data-priority="{{ task.priority }}"
++                                 data-title="{{ task.title }}" data-description="{{ task.description }}" data-assignee="{{ task.assignee_id|default_if_none:'' }}">
++                            <div class="task-card__top">
++                                <h3 class="task-card__title">{{ task.title }}</h3>
++                                <span class="task-card__actions">
++                                    <button type="button" class="icon-btn task-card__btn" onclick="openTaskEdit(this.closest('.task-card'))" title="Edit task" aria-label="Edit task">
++                                        <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 16h3l8-8-3-3-8 8v3ZM11 6l3 3"/></svg>
++                                    </button>
++                                    <form action="{% url 'task-delete' task.pk %}" method="post" onsubmit="return confirm('Delete this task?');">
++                                        {% csrf_token %}
++                                        <button type="submit" class="icon-btn task-card__btn task-card__delete" title="Delete task" aria-label="Delete task">
++                                            <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m5 5 10 10M15 5 5 15"/></svg>
++                                        </button>
++                                    </form>
++                                </span>
+                             </div>
+-                            <div class="task-card__actions">
+-                                <form action="{% url 'task-delete' task.pk %}" method="post" style="display:inline;" onsubmit="return confirm('Delete this task?');">
+-                                    {% csrf_token %}
+-                                    <button type="submit" class="btn btn--ghost btn--small" title="Delete">&times;</button>
+-                                </form>
++                            {% if task.description %}
++                                <p class="task-card__desc">{{ task.description|truncatewords:15 }}</p>
++                            {% endif %}
++                            <div class="task-card__meta">
++                                {% if task.assignee %}
++                                    <span class="avatar avatar--sm">{{ task.assignee.username|first|upper }}</span>
++                                    <span>{{ task.assignee.username }}</span>
++                                    <span class="meta-sep" aria-hidden="true"></span>
++                                {% endif %}
++                                <span>{{ task.created_at|date:"M j, Y" }}</span>
+                             </div>
+-                        </div>
++                            <span class="tag tag--{{ task.priority }}">
++                                <span class="bars" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
++                                {{ task.get_priority_display }}
++                            </span>
++                        </article>
+                     {% empty %}
+                         <div class="empty-col">No tasks</div>
+                     {% endfor %}
+                 </div>
+-            </div>
+-        {% empty %}
+-            <div class="empty-state">This board has no columns yet.</div>
++            </section>
+         {% endfor %}
++
++        <button type="button" class="add-column" onclick="openColumnModal()">
++            <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 4v12M4 10h12"/></svg>
++            Add column
++        </button>
+     </div>
++    {% else %}
++        <div class="empty-state">
++            <p><strong>This board has no columns yet.</strong></p>
++            <p>Columns are the lanes your tasks move through, like "To do" or "Done". Add the first one to get started.</p>
++            <button type="button" class="btn btn--primary" onclick="openColumnModal()">Add your first column</button>
++        </div>
++    {% endif %}
+ 
+-    <!-- Task create modal -->
+-    <div id="task-modal" class="modal" style="display:none;">
++    <!-- Task modal (create + edit) -->
++    <div id="task-modal" class="modal" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="task-modal-title">
+         <div class="modal-backdrop" onclick="closeTaskModal()"></div>
+         <div class="modal-panel">
+             <div class="modal-header">
+-                <h3>Create task</h3>
+-                <button type="button" class="btn btn--ghost btn--small" onclick="closeTaskModal">&times;</button>
++                <h3 id="task-modal-title">Create task</h3>
++                <button type="button" class="icon-btn" onclick="closeTaskModal()" aria-label="Close">
++                    <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m5 5 10 10M15 5 5 15"/></svg>
++                </button>
+             </div>
+-            <form id="task-form" method="post" action="{% url 'task-create' board.pk %}">
++            <form id="task-form" method="post" action="{% url 'task-create' board.pk %}" data-create-action="{% url 'task-create' board.pk %}" class="modal-form">
+                 {% csrf_token %}
+-                <input type="hidden" name="column" id="modal-column">
+                 <div class="form-field">
+                     <label for="modal-title">Title</label>
+-                    <input type="text" id="modal-title" name="title" maxlength="200" required autofocus>
++                    <input type="text" id="modal-title" name="title" maxlength="200" required>
+                 </div>
+                 <div class="form-field">
+                     <label for="modal-desc">Description</label>
+                     <textarea id="modal-desc" name="description" rows="3"></textarea>
+                 </div>
+                 <div class="form-field">
+-                    <label for="modal-priority">Priority</label>
+-                    <select id="modal-priority" name="priority">
+-                        <option value="low">Low</option>
+-                        <option value="medium" selected>Medium</option>
+-                        <option value="high">High</option>
+-                        <option value="critical">Critical</option>
++                    <label for="modal-column">Column</label>
++                    <select id="modal-column" name="column">
++                        {% for column in columns %}
++                            <option value="{{ column.pk }}">{{ column.name }}</option>
++                        {% endfor %}
+                     </select>
+                 </div>
++                <div class="form-row">
++                    <div class="form-field">
++                        <label for="modal-priority">Priority</label>
++                        <select id="modal-priority" name="priority">
++                            <option value="low">Low</option>
++                            <option value="medium" selected>Medium</option>
++                            <option value="high">High</option>
++                            <option value="critical">Critical</option>
++                        </select>
++                    </div>
++                    <div class="form-field">
++                        <label for="modal-assignee">Assignee</label>
++                        <select id="modal-assignee" name="assignee">
++                            <option value="">Unassigned</option>
++                            {% for u in users %}
++                                <option value="{{ u.pk }}">{{ u.username }}</option>
++                            {% endfor %}
++                        </select>
++                    </div>
++                </div>
++                <div class="form-actions form-actions--end">
++                    <button type="button" class="btn" onclick="closeTaskModal()">Cancel</button>
++                    <button type="submit" class="btn btn--primary" id="task-submit">Create task</button>
++                </div>
++            </form>
++        </div>
++    </div>
++
++    <!-- Column modal (create + edit) -->
++    <div id="column-modal" class="modal" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="column-modal-title">
++        <div class="modal-backdrop" onclick="closeColumnModal()"></div>
++        <div class="modal-panel modal-panel--small">
++            <div class="modal-header">
++                <h3 id="column-modal-title">Add column</h3>
++                <button type="button" class="icon-btn" onclick="closeColumnModal()" aria-label="Close">
++                    <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m5 5 10 10M15 5 5 15"/></svg>
++                </button>
++            </div>
++            <form id="column-form" method="post" action="{% url 'column-create' board.pk %}" data-create-action="{% url 'column-create' board.pk %}" class="modal-form">
++                {% csrf_token %}
++                <div class="form-field">
++                    <label for="column-name">Name</label>
++                    <input type="text" id="column-name" name="name" maxlength="100" required placeholder="e.g. In review">
++                </div>
+                 <div class="form-field">
+-                    <label for="modal-assignee">Assignee</label>
+-                    <select id="modal-assignee" name="assignee">
+-                        <option value="">Unassigned</option>
+-                        {% for u in users %}
+-                            <option value="{{ u.pk }}">{{ u.username }}</option>
++                    <span class="field-label" id="color-label">Color</span>
++                    <div class="swatches" role="radiogroup" aria-labelledby="color-label">
++                        {% for hex, label in swatches %}
++                            <label class="swatch" title="{{ label }}">
++                                <input type="radio" name="color" value="{{ hex }}"{% if forloop.first %} checked{% endif %}>
++                                <span style="background-color: {{ hex }};"></span>
++                            </label>
+                         {% endfor %}
+-                    </select>
++                    </div>
+                 </div>
+-                <div class="form-actions">
+-                    <button type="button" class="btn btn--ghost" onclick="closeTaskModal()">Cancel</button>
+-                    <button type="submit" class="btn btn--primary">Create task</button>
++                <div class="modal-footer">
++                    <button type="submit" form="column-delete-form" class="btn btn--danger" id="column-delete" hidden>Delete column</button>
++                    <div class="form-actions form-actions--end">
++                        <button type="button" class="btn" onclick="closeColumnModal()">Cancel</button>
++                        <button type="submit" class="btn btn--primary" id="column-submit">Add column</button>
++                    </div>
+                 </div>
+             </form>
++            <form id="column-delete-form" method="post" action="" hidden>{% csrf_token %}</form>
+         </div>
+     </div>
+-
+ {% endblock %}
+diff --git a/app/templates/app/board_list.html b/app/templates/app/board_list.html
+index 4d6de34..f58365f 100644
+--- a/app/templates/app/board_list.html
++++ b/app/templates/app/board_list.html
+@@ -1,27 +1,29 @@
+ {% extends 'app/base.html' %}
+ 
+ {% block title %}Boards - Focal Point{% endblock %}
++{% block page_title %}Boards{% endblock %}
+ 
+-{% block content %}
+-    <div class="page-header">
+-        <h1>Boards</h1>
+-        <a href="{% url 'board-create' %}" class="btn btn--primary">Create board</a>
+-    </div>
++{% block topbar_actions %}
++    <a href="{% url 'board-create' %}" class="btn btn--primary">Create board</a>
++{% endblock %}
+ 
++{% block content %}
+     {% if boards %}
+         <div class="board-list">
+             {% for board in boards %}
+-                <div class="board-card">
+-                    <a href="{% url 'board-detail' board.pk %}" class="board-card__link">
+-                        <h2 class="board-card__title">{{ board.name }}</h2>
+-                        <div class="board-card__meta">Created {{ board.created_at|date:"M d, Y" }}</div>
+-                    </a>
+-                </div>
++                <a href="{% url 'board-detail' board.pk %}" class="board-card">
++                    <span class="board-card__icon" aria-hidden="true">
++                        <svg viewBox="0 0 20 20"><rect x="3" y="3" width="6" height="14" rx="1.5"/><rect x="11" y="3" width="6" height="9" rx="1.5"/></svg>
++                    </span>
++                    <h2 class="board-card__title">{{ board.name }}</h2>
++                    <div class="board-card__meta">{{ board.tasks.count }} task{{ board.tasks.count|pluralize }} &middot; Created {{ board.created_at|date:"M j, Y" }}</div>
++                </a>
+             {% endfor %}
+         </div>
+     {% else %}
+         <div class="empty-state">
+-            <p>You don't have any boards yet. <a href="{% url 'board-create' %}">Create one</a> to get started.</p>
++            <p>You don't have any boards yet.</p>
++            <a href="{% url 'board-create' %}" class="btn btn--primary">Create your first board</a>
+         </div>
+     {% endif %}
+ {% endblock %}
+diff --git a/app/templates/registration/logged_out.html b/app/templates/registration/logged_out.html
+index 3bbb88c..444587b 100644
+--- a/app/templates/registration/logged_out.html
++++ b/app/templates/registration/logged_out.html
+@@ -3,7 +3,11 @@
+ {% block title %}Logged out - Focal Point{% endblock %}
+ 
+ {% block content %}
+-    <div class="page-header"><h1>Logged out</h1></div>
+-    <p>You have been logged out.</p>
+-    <a href="{% url 'login' %}" class="btn btn--primary">Log in again</a>
++    <div class="panel panel--narrow panel--auth">
++        <h2 class="panel__title">You're logged out</h2>
++        <p class="muted">You have been logged out of Focal Point.</p>
++        <div class="form-actions">
++            <a href="{% url 'login' %}" class="btn btn--primary btn--block">Log in again</a>
++        </div>
++    </div>
+ {% endblock %}
+diff --git a/app/templates/registration/login.html b/app/templates/registration/login.html
+index 76a3c92..1b8a935 100644
+--- a/app/templates/registration/login.html
++++ b/app/templates/registration/login.html
+@@ -3,26 +3,34 @@
+ {% block title %}Log in - Focal Point{% endblock %}
+ 
+ {% block content %}
+-    <div class="page-header"><h1>Log in</h1></div>
++    <div class="panel panel--narrow panel--auth">
++        <div class="workspace workspace--static">
++            <span class="workspace__logo">F</span>
++            <span class="workspace__text">
++                <span class="workspace__name">Focal Point</span>
++                <span class="workspace__sub">Task management</span>
++            </span>
++        </div>
++        <h2 class="panel__title">Log in</h2>
+ 
+-    {% if form.errors %}
+-        <div class="message error">Invalid username or password.</div>
+-    {% endif %}
++        {% if form.errors %}
++            <div class="message error">Invalid username or password.</div>
++        {% endif %}
+ 
+-    <form method="post" class="form form--narrow" novalidate>
+-        {% csrf_token %}
+-        <input type="hidden" name="next" value="{{ request.GET.next|default:'/boards/' }}">
+-        <div class="form-field">
+-            <label for="id_username">Username</label>
+-            {{ form.username }}
+-        </div>
+-        <div class="form-field">
+-            <label for="id_password">Password</label>
+-            {{ form.password }}
+-        </div>
+-        <div class="form-actions">
+-            <button type="submit" class="btn btn--primary">Log in</button>
+-            <a href="{% url 'board-list' %}" class="btn btn--ghost">Cancel</a>
+-        </div>
+-    </form>
++        <form method="post" class="form" novalidate>
++            {% csrf_token %}
++            <input type="hidden" name="next" value="{{ request.GET.next|default:'/boards/' }}">
++            <div class="form-field">
++                <label for="id_username">Username</label>
++                {{ form.username }}
++            </div>
++            <div class="form-field">
++                <label for="id_password">Password</label>
++                {{ form.password }}
++            </div>
++            <div class="form-actions">
++                <button type="submit" class="btn btn--primary btn--block">Log in</button>
++            </div>
++        </form>
++    </div>
+ {% endblock %}
+diff --git a/app/urls.py b/app/urls.py
+index 58c5ab6..9b823d6 100644
+--- a/app/urls.py
++++ b/app/urls.py
+@@ -9,4 +9,8 @@ urlpatterns = [
+     path('<int:board_pk>/tasks/create/', views.task_create, name='task-create'),
+     path('tasks/<int:pk>/update/', views.task_update, name='task-update'),
+     path('tasks/<int:pk>/delete/', views.task_delete, name='task-delete'),
++    path('tasks/<int:pk>/edit/', views.task_edit, name='task-edit'),
++    path('<int:board_pk>/columns/create/', views.column_create, name='column-create'),
++    path('columns/<int:pk>/edit/', views.column_edit, name='column-edit'),
++    path('columns/<int:pk>/delete/', views.column_delete, name='column-delete'),
+ ]
+diff --git a/app/views.py b/app/views.py
+index d1ec1a0..73ab873 100644
+--- a/app/views.py
++++ b/app/views.py
+@@ -1,11 +1,35 @@
+ from django.contrib.auth.decorators import login_required
+ from django.contrib.auth.models import User
+ from django.core.exceptions import PermissionDenied
++from django.db.models import Max
+ from django.http import JsonResponse
+ from django.shortcuts import get_object_or_404, redirect, render
+ 
+ from .models import Board, Column, Task
+ 
++DEFAULT_COLUMN_COLOR = '#e5e7eb'
++VALID_PRIORITIES = {value for value, _label in Task.PRIORITY_CHOICES}
++
++
++COLUMN_SWATCHES = [
++    ('#e5e7eb', 'Grey'),
++    ('#bfdbfe', 'Blue'),
++    ('#cdb8f5', 'Purple'),
++    ('#fbcfe8', 'Pink'),
++    ('#fecaca', 'Red'),
++    ('#fcd9a8', 'Orange'),
++    ('#fde68a', 'Yellow'),
++    ('#a7e3c0', 'Green'),
++]
++
++
++def _clean_color(value):
++    """Accept only #rrggbb values so the colour is safe to put in a style attribute."""
++    value = (value or '').strip()
++    if len(value) == 7 and value[0] == '#' and all(c in '0123456789abcdefABCDEF' for c in value[1:]):
++        return value
++    return DEFAULT_COLUMN_COLOR
++
+ 
+ @login_required
+ def board_list(request):
+@@ -20,10 +44,6 @@ def board_create(request):
+         if not name:
+             return render(request, 'app/board_create.html', {'error': 'Board name is required.'})
+         board = Board.objects.create(name=name, owner=request.user)
+-        # Seed default JIRA-ish columns.
+-        Column.objects.create(board=board, name='To Do', position=0, color='#edeff2')
+-        Column.objects.create(board=board, name='In Progress', position=1, color='#f8c291')
+-        Column.objects.create(board=board, name='Done', position=2, color='#87b5a5')
+         return redirect('board-detail', pk=board.pk)
+     return render(request, 'app/board_create.html')
+ 
+@@ -32,11 +52,12 @@ def board_create(request):
+ def board_detail(request, pk):
+     board = get_object_or_404(Board, pk=pk, owner=request.user)
+     columns = board.columns.all()
+-    users = User.objects.exclude(pk=request.user.pk)
++    users = User.objects.order_by('username')
+     return render(request, 'app/board_detail.html', {
+         'board': board,
+         'columns': columns,
+         'users': users,
++        'swatches': COLUMN_SWATCHES,
+     })
+ 
+ 
+@@ -56,7 +77,7 @@ def task_create(request, board_pk):
+             title=title,
+             description=request.POST.get('description', ''),
+             priority=request.POST.get('priority', 'medium'),
+-            assignee=request.POST.get('assignee') or None,
++            assignee_id=request.POST.get('assignee') or None,
+             position=last_position,
+         )
+     return redirect('board-detail', pk=board.pk)
+@@ -92,3 +113,68 @@ def task_delete(request, pk):
+     if request.method == 'POST':
+         task.delete()
+     return redirect('board-detail', pk=board_pk)
++
++
++@login_required
++def task_edit(request, pk):
++    task = get_object_or_404(Task, pk=pk)
++    if task.board.owner != request.user:
++        raise PermissionDenied
++    if request.method == 'POST':
++        title = (request.POST.get('title') or '').strip()
++        if title:
++            task.title = title[:200]
++            task.description = request.POST.get('description', '')
++            priority = request.POST.get('priority')
++            if priority in VALID_PRIORITIES:
++                task.priority = priority
++            task.assignee_id = request.POST.get('assignee') or None
++            column_id = request.POST.get('column')
++            if column_id and str(task.column_id) != column_id:
++                column = get_object_or_404(Column, pk=column_id, board=task.board)
++                task.column = column
++                # Moved by hand: put it at the bottom of the new column.
++                task.position = column.tasks.count()
++            task.save()
++    return redirect('board-detail', pk=task.board.pk)
++
++
++@login_required
++def column_create(request, board_pk):
++    board = get_object_or_404(Board, pk=board_pk, owner=request.user)
++    if request.method == 'POST':
++        name = (request.POST.get('name') or '').strip()
++        if name:
++            last = board.columns.aggregate(last=Max('position'))['last']
++            Column.objects.create(
++                board=board,
++                name=name[:100],
++                color=_clean_color(request.POST.get('color')),
++                position=0 if last is None else last + 1,
++            )
++    return redirect('board-detail', pk=board.pk)
++
++
++@login_required
++def column_edit(request, pk):
++    column = get_object_or_404(Column, pk=pk)
++    if column.board.owner != request.user:
++        raise PermissionDenied
++    if request.method == 'POST':
++        name = (request.POST.get('name') or '').strip()
++        if name:
++            column.name = name[:100]
++            column.color = _clean_color(request.POST.get('color'))
++            column.save()
++    return redirect('board-detail', pk=column.board.pk)
++
++
++@login_required
++def column_delete(request, pk):
++    column = get_object_or_404(Column, pk=pk)
++    if column.board.owner != request.user:
++        raise PermissionDenied
++    board_pk = column.board.pk
++    if request.method == 'POST':
++        column.delete()  # its tasks go with it
++    return redirect('board-detail', pk=board_pk)
+diff --git a/focalpoint/settings.py b/focalpoint/settings.py
+index 39be6d4..c2cc7c8 100644
+--- a/focalpoint/settings.py
++++ b/focalpoint/settings.py
+@@ -62,6 +62,7 @@ TEMPLATES = [
+                 'django.template.context_processors.request',
+                 'django.contrib.auth.context_processors.auth',
+                 'django.contrib.messages.context_processors.messages',
++                'app.context_processors.sidebar_boards',
+             ],
+         },
+     },

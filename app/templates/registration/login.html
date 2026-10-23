@@ -3,26 +3,34 @@
 {% block title %}Log in - Focal Point{% endblock %}
 
 {% block content %}
-    <div class="page-header"><h1>Log in</h1></div>
+    <div class="panel panel--narrow panel--auth">
+        <div class="workspace workspace--static">
+            <span class="workspace__logo">F</span>
+            <span class="workspace__text">
+                <span class="workspace__name">Focal Point</span>
+                <span class="workspace__sub">Task management</span>
+            </span>
+        </div>
+        <h2 class="panel__title">Log in</h2>
 
-    {% if form.errors %}
-        <div class="message error">Invalid username or password.</div>
-    {% endif %}
+        {% if form.errors %}
+            <div class="message error">Invalid username or password.</div>
+        {% endif %}
 
-    <form method="post" class="form form--narrow" novalidate>
-        {% csrf_token %}
-        <input type="hidden" name="next" value="{{ request.GET.next|default:'/boards/' }}">
-        <div class="form-field">
-            <label for="id_username">Username</label>
-            {{ form.username }}
-        </div>
-        <div class="form-field">
-            <label for="id_password">Password</label>
-            {{ form.password }}
-        </div>
-        <div class="form-actions">
-            <button type="submit" class="btn btn--primary">Log in</button>
-            <a href="{% url 'board-list' %}" class="btn btn--ghost">Cancel</a>
-        </div>
-    </form>
+        <form method="post" class="form" novalidate>
+            {% csrf_token %}
+            <input type="hidden" name="next" value="{{ request.GET.next|default:'/boards/' }}">
+            <div class="form-field">
+                <label for="id_username">Username</label>
+                {{ form.username }}
+            </div>
+            <div class="form-field">
+                <label for="id_password">Password</label>
+                {{ form.password }}
+            </div>
+            <div class="form-actions">
+                <button type="submit" class="btn btn--primary btn--block">Log in</button>
+            </div>
+        </form>
+    </div>
 {% endblock %}

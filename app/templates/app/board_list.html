@@ -1,27 +1,29 @@
 {% extends 'app/base.html' %}
 
 {% block title %}Boards - Focal Point{% endblock %}
+{% block page_title %}Boards{% endblock %}
+
+{% block topbar_actions %}
+    <a href="{% url 'board-create' %}" class="btn btn--primary">Create board</a>
+{% endblock %}
 
 {% block content %}
-    <div class="page-header">
-        <h1>Boards</h1>
-        <a href="{% url 'board-create' %}" class="btn btn--primary">Create board</a>
-    </div>
-
     {% if boards %}
         <div class="board-list">
             {% for board in boards %}
-                <div class="board-card">
-                    <a href="{% url 'board-detail' board.pk %}" class="board-card__link">
-                        <h2 class="board-card__title">{{ board.name }}</h2>
-                        <div class="board-card__meta">Created {{ board.created_at|date:"M d, Y" }}</div>
-                    </a>
-                </div>
+                <a href="{% url 'board-detail' board.pk %}" class="board-card">
+                    <span class="board-card__icon" aria-hidden="true">
+                        <svg viewBox="0 0 20 20"><rect x="3" y="3" width="6" height="14" rx="1.5"/><rect x="11" y="3" width="6" height="9" rx="1.5"/></svg>
+                    </span>
+                    <h2 class="board-card__title">{{ board.name }}</h2>
+                    <div class="board-card__meta">{{ board.tasks.count }} task{{ board.tasks.count|pluralize }} &middot; Created {{ board.created_at|date:"M j, Y" }}</div>
+                </a>
             {% endfor %}
         </div>
     {% else %}
         <div class="empty-state">
-            <p>You don't have any boards yet. <a href="{% url 'board-create' %}">Create one</a> to get started.</p>
+            <p>You don't have any boards yet.</p>
+            <a href="{% url 'board-create' %}" class="btn btn--primary">Create your first board</a>
         </div>
     {% endif %}
 {% endblock %}

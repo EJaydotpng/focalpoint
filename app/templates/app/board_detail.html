@@ -1,66 +1,88 @@
 {% extends 'app/base.html' %}
 
 {% block title %}{{ board.name }} - Focal Point{% endblock %}
+{% block page_title %}<a href="{% url 'board-list' %}" class="crumb">Boards</a><span class="crumb-sep">/</span>{{ board.name }}{% endblock %}
+
+{% block topbar_actions %}
+    <button type="button" class="btn btn--primary" onclick="openTaskModal()">Add task</button>
+{% endblock %}
+
+{% block toolbar %}
+    <div class="toolbar">
+        <label class="search">
+            <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="9" cy="9" r="5"/><path d="m13 13 4 4"/></svg>
+            <input type="search" id="task-search" placeholder="Search tasks" autocomplete="off">
+        </label>
+        <select id="priority-filter" class="select" aria-label="Filter by priority">
+            <option value="">All priorities</option>
+            <option value="low">Low</option>
+            <option value="medium">Medium</option>
+            <option value="high">High</option>
+            <option value="critical">Critical</option>
+        </select>
+    </div>
+{% endblock %}
 
 {% block content %}
-    <div class="board-header">
-        <div class="board-header__left">
-            <a href="{% url 'board-list' %}" class="btn btn--ghost">&larr; All boards</a>
-            <h1>{{ board.name }}</h1>
-        </div>
-        <div class="board-header__right">
-            <button type="button" class="btn btn--primary" onclick="openTaskModal()">Add task</button>
-        </div>
-    </div>
-
     <div class="kanban" data-task-update-url="{% url 'task-update' 0 %}">
         {% for column in columns %}
-            <div class="column" data-column-id="{{ column.pk }}">
-                <div class="column-header" style="background-color: {{ column.color }};">
-                    <div class="column-header__title">{{ column.name }}</div>
+            <section class="column" data-column-id="{{ column.pk }}">
+                <div class="column-header">
+                    <span class="stage-badge" style="background-color: {{ column.color }};">{{ column.name }}</span>
                     <span class="column-header__count">{{ column.tasks.count }}</span>
+                    <button type="button" class="icon-btn column-header__add" onclick="openTaskModal({{ column.pk }})" title="Add task to {{ column.name }}" aria-label="Add task to {{ column.name }}">
+                        <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 4v12M4 10h12"/></svg>
+                    </button>
                 </div>
                 <div class="column-body">
                     {% for task in column.tasks.all %}
-                        <div class="task-card draggable" data-task-id="{{ task.pk }}">
-                            <div class="task-card__content">
-                                <div class="task-card__title">{{ task.title }}</div>
-                                {% if task.description %}
-                                    <div class="task-card__desc">{{ task.description|truncatewords:15 }}</div>
-                                {% endif %}
-                                <div class="task-card__footer">
-                                    <span class="priority priority--{{ task.priority }}">{{ task.get_priority_display }}</span>
-                                    {% if task.assignee %}
-                                        <span class="assignee">@{{ task.assignee.username }}</span>
-                                    {% endif %}
-                                </div>
-                            </div>
-                            <div class="task-card__actions">
-                                <form action="{% url 'task-delete' task.pk %}" method="post" style="display:inline;" onsubmit="return confirm('Delete this task?');">
+                        <article class="task-card draggable" data-task-id="{{ task.pk }}" data-priority="{{ task.priority }}">
+                            <div class="task-card__top">
+                                <h3 class="task-card__title">{{ task.title }}</h3>
+                                <form action="{% url 'task-delete' task.pk %}" method="post" onsubmit="return confirm('Delete this task?');">
                                     {% csrf_token %}
-                                    <button type="submit" class="btn btn--ghost btn--small" title="Delete">&times;</button>
+                                    <button type="submit" class="icon-btn task-card__delete" title="Delete task" aria-label="Delete task">
+                                        <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m5 5 10 10M15 5 5 15"/></svg>
+                                    </button>
                                 </form>
                             </div>
-                        </div>
+                            {% if task.description %}
+                                <p class="task-card__desc">{{ task.description|truncatewords:15 }}</p>
+                            {% endif %}
+                            <div class="task-card__meta">
+                                {% if task.assignee %}
+                                    <span class="avatar avatar--sm">{{ task.assignee.username|first|upper }}</span>
+                                    <span>{{ task.assignee.username }}</span>
+                                    <span class="meta-sep" aria-hidden="true"></span>
+                                {% endif %}
+                                <span>{{ task.created_at|date:"M j, Y" }}</span>
+                            </div>
+                            <span class="tag tag--{{ task.priority }}">
+                                <span class="bars" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+                                {{ task.get_priority_display }}
+                            </span>
+                        </article>
                     {% empty %}
                         <div class="empty-col">No tasks</div>
                     {% endfor %}
                 </div>
-            </div>
+            </section>
         {% empty %}
             <div class="empty-state">This board has no columns yet.</div>
         {% endfor %}
     </div>
 
     <!-- Task create modal -->
-    <div id="task-modal" class="modal" style="display:none;">
+    <div id="task-modal" class="modal" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="task-modal-title">
         <div class="modal-backdrop" onclick="closeTaskModal()"></div>
         <div class="modal-panel">
             <div class="modal-header">
-                <h3>Create task</h3>
-                <button type="button" class="btn btn--ghost btn--small" onclick="closeTaskModal">&times;</button>
+                <h3 id="task-modal-title">Create task</h3>
+                <button type="button" class="icon-btn" onclick="closeTaskModal()" aria-label="Close">
+                    <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m5 5 10 10M15 5 5 15"/></svg>
+                </button>
             </div>
-            <form id="task-form" method="post" action="{% url 'task-create' board.pk %}">
+            <form id="task-form" method="post" action="{% url 'task-create' board.pk %}" class="modal-form">
                 {% csrf_token %}
                 <input type="hidden" name="column" id="modal-column">
                 <div class="form-field">
@@ -71,30 +93,31 @@
                     <label for="modal-desc">Description</label>
                     <textarea id="modal-desc" name="description" rows="3"></textarea>
                 </div>
-                <div class="form-field">
-                    <label for="modal-priority">Priority</label>
-                    <select id="modal-priority" name="priority">
-                        <option value="low">Low</option>
-                        <option value="medium" selected>Medium</option>
-                        <option value="high">High</option>
-                        <option value="critical">Critical</option>
-                    </select>
+                <div class="form-row">
+                    <div class="form-field">
+                        <label for="modal-priority">Priority</label>
+                        <select id="modal-priority" name="priority">
+                            <option value="low">Low</option>
+                            <option value="medium" selected>Medium</option>
+                            <option value="high">High</option>
+                            <option value="critical">Critical</option>
+                        </select>
+                    </div>
+                    <div class="form-field">
+                        <label for="modal-assignee">Assignee</label>
+                        <select id="modal-assignee" name="assignee">
+                            <option value="">Unassigned</option>
+                            {% for u in users %}
+                                <option value="{{ u.pk }}">{{ u.username }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
                 </div>
-                <div class="form-field">
-                    <label for="modal-assignee">Assignee</label>
-                    <select id="modal-assignee" name="assignee">
-                        <option value="">Unassigned</option>
-                        {% for u in users %}
-                            <option value="{{ u.pk }}">{{ u.username }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-                <div class="form-actions">
-                    <button type="button" class="btn btn--ghost" onclick="closeTaskModal()">Cancel</button>
+                <div class="form-actions form-actions--end">
+                    <button type="button" class="btn" onclick="closeTaskModal()">Cancel</button>
                     <button type="submit" class="btn btn--primary">Create task</button>
                 </div>
             </form>
         </div>
     </div>
-
 {% endblock %}

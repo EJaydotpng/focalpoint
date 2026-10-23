@@ -3,7 +3,11 @@
 {% block title %}Logged out - Focal Point{% endblock %}
 
 {% block content %}
-    <div class="page-header"><h1>Logged out</h1></div>
-    <p>You have been logged out.</p>
-    <a href="{% url 'login' %}" class="btn btn--primary">Log in again</a>
+    <div class="panel panel--narrow panel--auth">
+        <h2 class="panel__title">You're logged out</h2>
+        <p class="muted">You have been logged out of Focal Point.</p>
+        <div class="form-actions">
+            <a href="{% url 'login' %}" class="btn btn--primary btn--block">Log in again</a>
+        </div>
+    </div>
 {% endblock %}

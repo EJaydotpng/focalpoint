@@ -56,7 +56,7 @@ def task_create(request, board_pk):
             title=title,
             description=request.POST.get('description', ''),
             priority=request.POST.get('priority', 'medium'),
-            assignee=request.POST.get('assignee') or None,
+            assignee_id=request.POST.get('assignee') or None,
             position=last_position,
         )
     return redirect('board-detail', pk=board.pk)

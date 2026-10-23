@@ -5,40 +5,87 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{% block title %}Focal Point{% endblock %}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap">
     <link rel="stylesheet" href="{% static 'app/css/kanban.css' %}">
     {% block extra_css %}{% endblock %}
 </head>
 <body>
-    <header class="header">
-        <div class="header-inner">
-            <a href="{% url 'board-list' %}" class="brand">Focal Point</a>
-            <nav class="nav">
-                {% if user.is_authenticated %}
-                    <a href="{% url 'board-list' %}" class="nav-link">Boards</a>
-                    <a href="{% url 'board-create' %}" class="nav-link nav-link--create">Create Board</a>
-                    <form action="{% url 'logout' %}" method="post" style="display:inline;">
-                        {% csrf_token %}
-                        <button type="submit" class="nav-link nav-link--logout">Log out {{ user.username }}</button>
-                    </form>
-                {% else %}
-                    <a href="{% url 'login' %}" class="nav-link">Log in</a>
-                {% endif %}
-            </nav>
+<div class="app{% if not user.is_authenticated %} app--public{% endif %}" id="app">
+    {% if user.is_authenticated %}
+    <aside class="sidebar" id="sidebar">
+        <a href="{% url 'board-list' %}" class="workspace">
+            <span class="workspace__logo">F</span>
+            <span class="workspace__text">
+                <span class="workspace__name">Focal Point</span>
+                <span class="workspace__sub">Task management</span>
+            </span>
+        </a>
+
+        <nav class="side-nav" aria-label="Main">
+            <a href="{% url 'board-list' %}" class="side-link{% if request.resolver_match.url_name == 'board-list' %} is-active{% endif %}">
+                <svg viewBox="0 0 20 20" aria-hidden="true"><rect x="3" y="3" width="6" height="14" rx="1.5"/><rect x="11" y="3" width="6" height="9" rx="1.5"/></svg>
+                All boards
+            </a>
+            <a href="{% url 'board-create' %}" class="side-link{% if request.resolver_match.url_name == 'board-create' %} is-active{% endif %}">
+                <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 4v12M4 10h12"/></svg>
+                Create board
+            </a>
+        </nav>
+
+        <div class="side-section">
+            <div class="side-section__head">Your boards</div>
+            {% for b in sidebar_boards %}
+                <a href="{% url 'board-detail' b.pk %}" class="side-link side-link--board{% if board and board.pk == b.pk %} is-active{% endif %}">
+                    <span class="board-dot" aria-hidden="true"></span>
+                    <span class="side-link__label">{{ b.name }}</span>
+                </a>
+            {% empty %}
+                <p class="side-empty">No boards yet</p>
+            {% endfor %}
         </div>
-    </header>
 
-    <main class="container">
-        {% if messages %}
-            <div class="messages">
-                {% for message in messages %}
-                    <div class="message {{ message.tags }}">{{ message }}</div>
-                {% endfor %}
-            </div>
+        <div class="side-user">
+            <span class="avatar">{{ user.username|first|upper }}</span>
+            <span class="side-user__name">{{ user.username }}</span>
+            <form action="{% url 'logout' %}" method="post">
+                {% csrf_token %}
+                <button type="submit" class="icon-btn" title="Log out" aria-label="Log out">
+                    <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M8 4H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3M12 7l3 3-3 3M7 10h8"/></svg>
+                </button>
+            </form>
+        </div>
+    </aside>
+    <div class="scrim" id="scrim"></div>
+    {% endif %}
+
+    <div class="main">
+        {% if user.is_authenticated %}
+        <header class="topbar">
+            <button type="button" class="icon-btn menu-btn" id="menu-btn" aria-label="Open menu">
+                <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 6h14M3 10h14M3 14h14"/></svg>
+            </button>
+            <h1 class="topbar__title">{% block page_title %}Focal Point{% endblock %}</h1>
+            <div class="topbar__actions">{% block topbar_actions %}{% endblock %}</div>
+        </header>
+        {% block toolbar %}{% endblock %}
         {% endif %}
-        {% block content %}{% endblock %}
-    </main>
 
-    <script src="{% static 'app/js/kanban.js' %}"></script>
-    {% block scripts %}{% endblock %}
+        <main class="content">
+            {% if messages %}
+                <div class="messages">
+                    {% for message in messages %}
+                        <div class="message {{ message.tags }}">{{ message }}</div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+            {% block content %}{% endblock %}
+        </main>
+    </div>
+</div>
+
+<script src="{% static 'app/js/kanban.js' %}"></script>
+{% block scripts %}{% endblock %}
 </body>
 </html>

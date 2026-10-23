@@ -1,4 +1,4 @@
-/* Focal Point — Kanban drag-and-drop + task creation (single source of truth) */
+/* Focal Point — Kanban drag-and-drop, task creation, filters, mobile menu */
 
 (function () {
     let draggedTaskId = null;
@@ -140,11 +140,50 @@
         });
     }
 
+    // Client-side search + priority filter
+    function setupFilters() {
+        const search = document.getElementById('task-search');
+        const priority = document.getElementById('priority-filter');
+        if (!search || !priority) return;
+
+        function apply() {
+            const q = search.value.trim().toLowerCase();
+            const p = priority.value;
+            document.querySelectorAll('.task-card').forEach((card) => {
+                const matchesText = !q || card.textContent.toLowerCase().includes(q);
+                const matchesPriority = !p || card.dataset.priority === p;
+                card.hidden = !(matchesText && matchesPriority);
+            });
+        }
+        search.addEventListener('input', apply);
+        priority.addEventListener('change', apply);
+    }
+
+    // Sidebar toggle on narrow screens
+    function setupMenu() {
+        const app = document.getElementById('app');
+        const btn = document.getElementById('menu-btn');
+        const scrim = document.getElementById('scrim');
+        if (!app || !btn) return;
+        btn.addEventListener('click', () => app.classList.toggle('sidebar-open'));
+        if (scrim) scrim.addEventListener('click', () => app.classList.remove('sidebar-open'));
+    }
+
+    // Escape closes the task modal
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && document.getElementById('task-modal')) closeTaskModal();
+    });
+
     // Wire up drag-and-drop once the DOM is ready
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', attachDragDrop);
-    } else {
+    function init() {
         attachDragDrop();
+        setupFilters();
+        setupMenu();
+    }
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init);
+    } else {
+        init();
     }
     // Re-wire after any dynamic re-render (e.g. new task added)
     window.__focalpointAttachDragDrop = attachDragDrop;
