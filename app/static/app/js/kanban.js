@@ -1,7 +1,30 @@
-/* Focal Point — Kanban drag-and-drop + task creation */
+/* Focal Point — Kanban drag-and-drop + task creation (single source of truth) */
 
 (function () {
     let draggedTaskId = null;
+
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === name + '=') {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+
+    function updateTaskUrl(taskId) {
+        const board = document.querySelector('.kanban');
+        if (!board) return null;
+        const base = board.dataset.taskUpdateUrl || '/boards/tasks/0/update/';
+        // base looks like /boards/tasks/0/update/; swap the 0 for the real task id
+        return base.replace('/0/', `/${taskId}/`);
+    }
 
     function onDragStart(e) {
         draggedTaskId = e.target.dataset.taskId;
@@ -53,8 +76,9 @@
             cards[insertAt].parentNode.insertBefore(taskEl, cards[insertAt]);
         }
 
-        // Persist via AJAX to task-update
-        const updateUrl = `{% url 'task-update' 0 %}`.replace('/0/', `/${taskId}/`);
+        // Persist via AJAX
+        const updateUrl = updateTaskUrl(taskId);
+        if (!updateUrl) return;
         fetch(updateUrl, {
             method: 'POST',
             headers: {
@@ -73,19 +97,19 @@
             .catch(() => alert('Failed to move task.'));
     }
 
-    function getCookie(name) {
-        let cookieValue = null;
-        if (document.cookie && document.cookie !== '') {
-            const cookies = document.cookie.split(';');
-            for (let i = 0; i < cookies.length; i++) {
-                const cookie = cookies[i].trim();
-                if (cookie.substring(0, name.length + 1) === name + '=') {
-                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                    break;
-                }
-            }
-        }
-        return cookieValue;
+    function attachDragDrop() {
+        // Column drop zones
+        document.querySelectorAll('.column').forEach((column) => {
+            column.addEventListener('dragover', onDragOver);
+            column.addEventListener('dragenter', onDragEnter);
+            column.addEventListener('dragleave', onDragLeave);
+            column.addEventListener('drop', onDrop);
+        });
+        // Task cards
+        document.querySelectorAll('.task-card.draggable').forEach((card) => {
+            card.setAttribute('draggable', 'true');
+            card.addEventListener('dragstart', onDragStart);
+        });
     }
 
     function openTaskModal(columnId) {
@@ -104,12 +128,7 @@
         document.getElementById('task-modal').style.display = 'none';
     }
 
-    // Expose inline handlers used by templates (kept minimal)
-    window.onDragStart = onDragStart;
-    window.onDragOver = onDragOver;
-    window.onDragEnter = onDragEnter;
-    window.onDragLeave = onDragLeave;
-    window.onDrop = onDrop;
+    // Expose for inline onclick handlers in templates
     window.openTaskModal = openTaskModal;
     window.closeTaskModal = closeTaskModal;
 
@@ -120,4 +139,13 @@
             if (e.target.id === 'task-modal') closeTaskModal();
         });
     }
+
+    // Wire up drag-and-drop once the DOM is ready
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', attachDragDrop);
+    } else {
+        attachDragDrop();
+    }
+    // Re-wire after any dynamic re-render (e.g. new task added)
+    window.__focalpointAttachDragDrop = attachDragDrop;
 })();
