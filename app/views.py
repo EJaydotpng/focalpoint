@@ -6,7 +6,8 @@ from django.db.models import F, Max
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 
-from .models import Board, Category, Column, Task, default_prefix
+from . import audit
+from .models import Board, Category, Column, Task, TaskEvent, default_prefix
 
 DEFAULT_COLUMN_COLOR = '#e5e7eb'
 VALID_PRIORITIES = {value for value, _label in Task.PRIORITY_CHOICES}
@@ -95,7 +96,7 @@ def task_create(request, board_pk):
             # Take the next ticket number for this board.
             Board.objects.filter(pk=board.pk).update(ticket_counter=F('ticket_counter') + 1)
             board.refresh_from_db(fields=['ticket_counter'])
-            Task.objects.create(
+            task = Task.objects.create(
                 board=board,
                 column=column,
                 number=board.ticket_counter,
@@ -106,6 +107,7 @@ def task_create(request, board_pk):
                 category=_board_category(board, request.POST.get('category')),
                 position=last_position,
             )
+            audit.record_created(task, request.user)
     return redirect('board-detail', pk=board.pk)
 
 
@@ -117,6 +119,7 @@ def task_update(request, pk):
     if request.method == 'POST':
         column_id = request.POST.get('column')
         position = request.POST.get('position')
+        old = audit.snapshot(task)
         if column_id:
             column = get_object_or_404(Column, pk=column_id, board=task.board)
             task.column = column
@@ -126,6 +129,7 @@ def task_update(request, pk):
             except (TypeError, ValueError):
                 pass
         task.save()
+        audit.record_edit(task, old, request.user)  # logs a "moved" event if the column changed
         return JsonResponse({'status': 'ok'})
     return JsonResponse({'status': 'error'}, status=405)
 
@@ -137,6 +141,7 @@ def task_delete(request, pk):
         raise PermissionDenied
     board_pk = task.board.pk
     if request.method == 'POST':
+        audit.record_deleted(task, request.user)
         task.delete()
     return redirect('board-detail', pk=board_pk)
 
@@ -149,6 +154,7 @@ def task_edit(request, pk):
     if request.method == 'POST':
         title = (request.POST.get('title') or '').strip()
         if title:
+            old = audit.snapshot(task)
             task.title = title[:200]
             task.description = request.POST.get('description', '')
             priority = request.POST.get('priority')
@@ -163,6 +169,7 @@ def task_edit(request, pk):
                 # Moved by hand: put it at the bottom of the new column.
                 task.position = column.tasks.count()
             task.save()
+            audit.record_edit(task, old, request.user)
     return redirect('board-detail', pk=task.board.pk)
 
 
@@ -203,6 +210,8 @@ def column_delete(request, pk):
         raise PermissionDenied
     board_pk = column.board.pk
     if request.method == 'POST':
+        for task in column.tasks.select_related('board', 'column'):
+            audit.record_deleted(task, request.user, note=f'Column "{column.name}" was deleted')
         column.delete()  # its tasks go with it
     return redirect('board-detail', pk=board_pk)
 
@@ -241,5 +250,46 @@ def category_delete(request, pk):
         raise PermissionDenied
     board_pk = category.board.pk
     if request.method == 'POST':
+        for task in category.tasks.select_related('board'):
+            audit.record(
+                task, TaskEvent.EDITED, request.user,
+                [{'field': 'Category', 'from': category.name, 'to': ''}],
+                note=f'Category "{category.name}" was deleted',
+            )
         category.delete()  # tasks keep existing, just uncategorised
     return redirect('board-detail', pk=board_pk)
+
+
+def _event_json(event):
+    return {
+        'id': event.pk,
+        'type': event.event_type,
+        'headline': event.headline,
+        'details': event.detail_lines,
+        'actor': event.actor_name,
+        'created_at': event.created_at.isoformat(),
+    }
+
+
+@login_required
+def task_history(request, pk):
+    """JSON audit trail for one task, newest first (used by the task view dialog)."""
+    task = get_object_or_404(Task, pk=pk)
+    if task.board.owner != request.user:
+        raise PermissionDenied
+    events = task.events.select_related('actor')
+    return JsonResponse({'ticket': f'{task.board.prefix}-{task.number}', 'events': [_event_json(e) for e in events]})
+
+
+@login_required
+def board_activity(request, board_pk):
+    """Everything that happened on a board, including tasks that no longer exist."""
+    board = get_object_or_404(Board, pk=board_pk, owner=request.user)
+    limit = 300
+    events = list(board.events.select_related('actor')[: limit + 1])
+    return render(request, 'app/board_activity.html', {
+        'board': board,
+        'events': events[:limit],
+        'truncated': len(events) > limit,
+        'limit': limit,
+    })

@@ -4,6 +4,7 @@
 {% block page_title %}<a href="{% url 'board-list' %}" class="crumb">Boards</a><span class="crumb-sep">/</span>{{ board.name }}{% endblock %}
 
 {% block topbar_actions %}
+    <a href="{% url 'board-activity' board.pk %}" class="btn">Activity</a>
     <button type="button" class="btn" onclick="openCategoryModal()">Categories</button>
     <button type="button" class="btn" onclick="openColumnModal()">Add column</button>
     {% if columns %}
@@ -42,6 +43,7 @@
     <div class="kanban"
          data-task-update-url="{% url 'task-update' 0 %}"
          data-task-edit-url="{% url 'task-edit' 0 %}"
+         data-task-history-url="{% url 'task-history' 0 %}"
          data-column-edit-url="{% url 'column-edit' 0 %}"
          data-column-delete-url="{% url 'column-delete' 0 %}">
         {% for column in columns %}
@@ -143,6 +145,8 @@
                 </dl>
                 <h4 class="view-heading">Description</h4>
                 <p class="view-desc" id="view-desc"></p>
+                <h4 class="view-heading">Activity</h4>
+                <ol class="timeline" id="view-history" aria-live="polite"></ol>
                 <div class="form-actions form-actions--end">
                     <button type="button" class="btn" onclick="closeTaskView()">Close</button>
                     <button type="button" class="btn btn--primary" id="view-edit">Edit task</button>

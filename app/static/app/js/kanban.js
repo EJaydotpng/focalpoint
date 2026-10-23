@@ -340,6 +340,99 @@
 
         document.getElementById('view-modal').style.display = 'flex';
         document.getElementById('view-edit').focus();
+        loadHistory(card);
+    }
+
+    // ----- Local times & task history -----
+    function formatLocal(iso) {
+        const date = new Date(iso);
+        if (isNaN(date)) return null;
+        return date.toLocaleString(undefined, {
+            year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
+        });
+    }
+
+    // Show server timestamps in the viewer's own time zone
+    function localizeTimes(root) {
+        (root || document).querySelectorAll('time.local-time').forEach((el) => {
+            const text = formatLocal(el.getAttribute('datetime'));
+            if (text) el.textContent = text;
+        });
+    }
+
+    let historyRequest = 0;
+
+    function renderHistory(list, events) {
+        list.textContent = '';
+        if (!events.length) {
+            const li = document.createElement('li');
+            li.className = 'timeline__empty';
+            li.textContent = 'No activity recorded yet.';
+            list.appendChild(li);
+            return;
+        }
+        events.forEach((event) => {
+            const li = document.createElement('li');
+            li.className = `timeline__item timeline__item--${event.type}`;
+
+            const head = document.createElement('div');
+            head.className = 'timeline__head';
+            head.textContent = event.headline;
+            li.appendChild(head);
+
+            if (event.details.length) {
+                const ul = document.createElement('ul');
+                ul.className = 'event-details';
+                event.details.forEach((line) => {
+                    const d = document.createElement('li');
+                    d.textContent = line;
+                    ul.appendChild(d);
+                });
+                li.appendChild(ul);
+            }
+
+            const meta = document.createElement('div');
+            meta.className = 'timeline__meta';
+            const time = document.createElement('time');
+            time.className = 'local-time';
+            time.setAttribute('datetime', event.created_at);
+            time.textContent = event.created_at;
+            meta.appendChild(document.createTextNode(`${event.actor} \u00b7 `));
+            meta.appendChild(time);
+            li.appendChild(meta);
+
+            list.appendChild(li);
+        });
+        localizeTimes(list);
+    }
+
+    function loadHistory(card) {
+        const list = document.getElementById('view-history');
+        const board = document.querySelector('.kanban');
+        const request = ++historyRequest;
+        list.textContent = '';
+        const loading = document.createElement('li');
+        loading.className = 'timeline__empty';
+        loading.textContent = 'Loading activity\u2026';
+        list.appendChild(loading);
+
+        const url = board.dataset.taskHistoryUrl.replace('/0/', `/${card.dataset.taskId}/`);
+        fetch(url, { credentials: 'same-origin', headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+            .then((r) => {
+                if (!r.ok) throw new Error('bad response');
+                return r.json();
+            })
+            .then((data) => {
+                if (request === historyRequest) renderHistory(list, data.events);
+            })
+            .catch(() => {
+                if (request !== historyRequest) return;
+                list.textContent = '';
+                const li = document.createElement('li');
+                li.className = 'timeline__empty';
+                li.textContent = 'Could not load activity.';
+                list.appendChild(li);
+            });
     }
 
     function closeTaskView() {
@@ -429,6 +522,7 @@
 
     // Wire up drag-and-drop once the DOM is ready
     function init() {
+        localizeTimes();
         attachDragDrop();
         setupFilters();
         setupMenu();

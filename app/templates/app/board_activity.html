@@ -1,0 +1,52 @@
+{% extends 'app/base.html' %}
+
+{% block title %}Activity - {{ board.name }} - Focal Point{% endblock %}
+{% block page_title %}<a href="{% url 'board-list' %}" class="crumb">Boards</a><span class="crumb-sep">/</span><a href="{% url 'board-detail' board.pk %}" class="crumb">{{ board.name }}</a><span class="crumb-sep">/</span>Activity{% endblock %}
+
+{% block topbar_actions %}
+    <a href="{% url 'board-detail' board.pk %}" class="btn">Back to board</a>
+{% endblock %}
+
+{% block content %}
+    {% if events %}
+        <div class="activity">
+            <table class="activity-table">
+                <thead>
+                    <tr><th>When</th><th>Ticket</th><th>What happened</th><th>By</th></tr>
+                </thead>
+                <tbody>
+                    {% for event in events %}
+                        <tr>
+                            <td class="activity-when">
+                                <time class="local-time" datetime="{{ event.created_at|date:'c' }}">{{ event.created_at|date:"M j, Y, g:i A" }} UTC</time>
+                            </td>
+                            <td>
+                                <span class="activity-ticket">{{ event.ticket }}</span>
+                                <span class="activity-title">{{ event.task_title }}</span>
+                                {% if event.event_type == 'deleted' %}<span class="activity-gone">deleted</span>{% endif %}
+                            </td>
+                            <td>
+                                <span class="event-badge event-badge--{{ event.event_type }}">{{ event.get_event_type_display }}</span>
+                                <span class="activity-headline">{{ event.headline }}</span>
+                                {% if event.detail_lines %}
+                                    <ul class="event-details">
+                                        {% for line in event.detail_lines %}<li>{{ line }}</li>{% endfor %}
+                                    </ul>
+                                {% endif %}
+                            </td>
+                            <td class="activity-by">{{ event.actor_name }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% if truncated %}
+                <p class="muted activity-note">Showing the most recent {{ limit }} events.</p>
+            {% endif %}
+        </div>
+    {% else %}
+        <div class="empty-state">
+            <p><strong>No activity yet.</strong></p>
+            <p>Creating, editing, moving and deleting tasks will show up here.</p>
+        </div>
+    {% endif %}
+{% endblock %}
