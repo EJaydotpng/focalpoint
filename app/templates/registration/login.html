@@ -1,0 +1,28 @@
+{% extends 'app/base.html' %}
+
+{% block title %}Log in - Focal Point{% endblock %}
+
+{% block content %}
+    <div class="page-header"><h1>Log in</h1></div>
+
+    {% if form.errors %}
+        <div class="message error">Invalid username or password.</div>
+    {% endif %}
+
+    <form method="post" class="form form--narrow" novalidate>
+        {% csrf_token %}
+        <input type="hidden" name="next" value="{{ request.GET.next|default:'/boards/' }}">
+        <div class="form-field">
+            <label for="id_username">Username</label>
+            {{ form.username }}
+        </div>
+        <div class="form-field">
+            <label for="id_password">Password</label>
+            {{ form.password }}
+        </div>
+        <div class="form-actions">
+            <button type="submit" class="btn btn--primary">Log in</button>
+            <a href="{% url 'board-list' %}" class="btn btn--ghost">Cancel</a>
+        </div>
+    </form>
+{% endblock %}

@@ -1,0 +1,27 @@
+{% extends 'app/base.html' %}
+
+{% block title %}Boards - Focal Point{% endblock %}
+
+{% block content %}
+    <div class="page-header">
+        <h1>Boards</h1>
+        <a href="{% url 'board-create' %}" class="btn btn--primary">Create board</a>
+    </div>
+
+    {% if boards %}
+        <div class="board-list">
+            {% for board in boards %}
+                <div class="board-card">
+                    <a href="{% url 'board-detail' board.pk %}" class="board-card__link">
+                        <h2 class="board-card__title">{{ board.name }}</h2>
+                        <div class="board-card__meta">Created {{ board.created_at|date:"M d, Y" }}</div>
+                    </a>
+                </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="empty-state">
+            <p>You don't have any boards yet. <a href="{% url 'board-create' %}">Create one</a> to get started.</p>
+        </div>
+    {% endif %}
+{% endblock %}

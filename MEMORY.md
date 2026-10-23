@@ -1,0 +1,1 @@
+- [Focal Point Kanban Task Manager](memory/focalpoint-kanban-task-manager.md) — Django JIRA-inspired Kanban board app (boards, columns, tasks, drag-and-drop, JIRA-like UI)

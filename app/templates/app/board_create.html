@@ -1,0 +1,23 @@
+{% extends 'app/base.html' %}
+
+{% block title %}Create Board - Focal Point{% endblock %}
+
+{% block content %}
+    <div class="page-header"><h1>Create board</h1></div>
+
+    {% if error %}
+        <div class="message error">{{ error }}</div>
+    {% endif %}
+
+    <form method="post" class="form form--narrow" novalidate>
+        {% csrf_token %}
+        <div class="form-field">
+            <label for="name">Board name</label>
+            <input type="text" id="name" name="name" maxlength="200" required autofocus placeholder="e.g. Sprint 1">
+        </div>
+        <div class="form-actions">
+            <button type="submit" class="btn btn--primary">Create board</button>
+            <a href="{% url 'board-list' %}" class="btn btn--ghost">Cancel</a>
+        </div>
+    </form>
+{% endblock %}

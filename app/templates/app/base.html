@@ -1,0 +1,44 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}Focal Point{% endblock %}</title>
+    <link rel="stylesheet" href="{% static 'app/css/kanban.css' %}">
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    <header class="header">
+        <div class="header-inner">
+            <a href="{% url 'board-list' %}" class="brand">Focal Point</a>
+            <nav class="nav">
+                {% if user.is_authenticated %}
+                    <a href="{% url 'board-list' %}" class="nav-link">Boards</a>
+                    <a href="{% url 'board-create' %}" class="nav-link nav-link--create">Create Board</a>
+                    <form action="{% url 'logout' %}" method="post" style="display:inline;">
+                        {% csrf_token %}
+                        <button type="submit" class="nav-link nav-link--logout">Log out {{ user.username }}</button>
+                    </form>
+                {% else %}
+                    <a href="{% url 'login' %}" class="nav-link">Log in</a>
+                {% endif %}
+            </nav>
+        </div>
+    </header>
+
+    <main class="container">
+        {% if messages %}
+            <div class="messages">
+                {% for message in messages %}
+                    <div class="message {{ message.tags }}">{{ message }}</div>
+                {% endfor %}
+            </div>
+        {% endif %}
+        {% block content %}{% endblock %}
+    </main>
+
+    <script src="{% static 'app/js/kanban.js' %}"></script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

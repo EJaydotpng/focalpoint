@@ -1,0 +1,185 @@
+{% extends 'app/base.html' %}
+
+{% block title %}{{ board.name }} - Focal Point{% endblock %}
+
+{% block content %}
+    <div class="board-header">
+        <div class="board-header__left">
+            <a href="{% url 'board-list' %}" class="btn btn--ghost">&larr; All boards</a>
+            <h1>{{ board.name }}</h1>
+        </div>
+        <div class="board-header__right">
+            <button type="button" class="btn btn--primary" onclick="openTaskModal()">Add task</button>
+        </div>
+    </div>
+
+    <div class="kanban">
+        {% for column in columns %}
+            <div class="column" data-column-id="{{ column.pk }}"
+                 ondragover="onDragOver(event)" ondragenter="onDragEnter(event)"
+                 ondragleave="onDragLeave(event)" ondrop="onDrop(event)">
+                <div class="column-header" style="background-color: {{ column.color }};">
+                    <div class="column-header__title">{{ column.name }}</div>
+                    <span class="column-header__count">{{ column.tasks.count }}</span>
+                </div>
+                <div class="column-body">
+                    {% for task in column.tasks.all %}
+                        <div class="task-card" draggable="true" data-task-id="{{ task.pk }}"
+                             ondragstart="onDragStart(event)">
+                            <div class="task-card__content">
+                                <div class="task-card__title">{{ task.title }}</div>
+                                {% if task.description %}
+                                    <div class="task-card__desc">{{ task.description|truncatewords:15 }}</div>
+                                {% endif %}
+                                <div class="task-card__footer">
+                                    <span class="priority priority--{{ task.priority }}">{{ task.get_priority_display }}</span>
+                                    {% if task.assignee %}
+                                        <span class="assignee">@{{ task.assignee.username }}</span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="task-card__actions">
+                                <form action="{% url 'task-delete' task.pk %}" method="post" style="display:inline;" onsubmit="return confirm('Delete this task?');">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn--ghost btn--small" title="Delete">&times;</button>
+                                </form>
+                            </div>
+                        </div>
+                    {% empty %}
+                        <div class="empty-col">No tasks</div>
+                    {% endfor %}
+                </div>
+            </div>
+        {% empty %}
+            <div class="empty-state">This board has no columns yet.</div>
+        {% endfor %}
+    </div>
+
+    <!-- Task create modal -->
+    <div id="task-modal" class="modal" style="display:none;">
+        <div class="modal-backdrop" onclick="closeTaskModal()"></div>
+        <div class="modal-panel">
+            <div class="modal-header">
+                <h3>Create task</h3>
+                <button type="button" class="btn btn--ghost btn--small" onclick="closeTaskModal">&times;</button>
+            </div>
+            <form id="task-form" method="post" action="{% url 'task-create' board.pk %}">
+                {% csrf_token %}
+                <input type="hidden" name="column" id="modal-column">
+                <div class="form-field">
+                    <label for="modal-title">Title</label>
+                    <input type="text" id="modal-title" name="title" maxlength="200" required autofocus>
+                </div>
+                <div class="form-field">
+                    <label for="modal-desc">Description</label>
+                    <textarea id="modal-desc" name="description" rows="3"></textarea>
+                </div>
+                <div class="form-field">
+                    <label for="modal-priority">Priority</label>
+                    <select id="modal-priority" name="priority">
+                        <option value="low">Low</option>
+                        <option value="medium" selected>Medium</option>
+                        <option value="high">High</option>
+                        <option value="critical">Critical</option>
+                    </select>
+                </div>
+                <div class="form-field">
+                    <label for="modal-assignee">Assignee</label>
+                    <select id="modal-assignee" name="assignee">
+                        <option value="">Unassigned</option>
+                        {% for u in users %}
+                            <option value="{{ u.pk }}">{{ u.username }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn btn--ghost" onclick="closeTaskModal()">Cancel</button>
+                    <button type="submit" class="btn btn--primary">Create task</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        let draggedTaskId = null;
+
+        function onDragStart(e) {
+            draggedTaskId = e.target.dataset.taskId;
+            e.target.classList.add('dragging');
+            e.dataTransfer.setData('text/plain', draggedTaskId);
+        }
+
+        function onDragOver(e) {
+            e.preventDefault();
+            e.currentTarget.classList.add('drag-over');
+        }
+
+        function onDragEnter(e) {
+            e.preventDefault();
+        }
+
+        function onDragLeave(e) {
+            e.currentTarget.classList.remove('drag-over');
+        }
+
+        function onDrop(e) {
+            e.preventDefault();
+            const column = e.currentTarget;
+            column.classList.remove('drag-over');
+            const taskId = e.dataTransfer.getData('text/plain');
+            if (!taskId) return;
+
+            const taskEl = document.querySelector(`[data-task-id="${taskId}"]`);
+            if (!taskEl) return;
+            taskEl.classList.remove('dragging');
+
+            // Determine position by index among existing cards in this column
+            const body = column.querySelector('.column-body');
+            const cards = Array.from(body.querySelectorAll('.task-card')).filter(c => c.dataset.taskId !== taskId);
+            const insertAt = cards.findIndex(c => {
+                const rect = c.getBoundingClientRect();
+                return e.clientY < rect.top + rect.height / 2;
+            });
+            const position = insertAt === -1 ? cards.length : insertAt;
+
+            // Move element visually right away for responsiveness
+            if (insertAt === -1) {
+                body.appendChild(taskEl);
+            } else {
+                cards[insertAt].parentNode.insertBefore(taskEl, cards[insertAt]);
+            }
+
+            // Persist via AJAX
+            fetch(`{% url 'task-update' 0 %}`.replace('/0/', `/${taskId}/`), {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+                body: `column=${column.dataset.columnId}&position=${position}`,
+                credentials: 'same-origin',
+            }).then(r => {
+                if (!r.ok) {
+                    alert('Failed to move task.');
+                }
+            }).catch(() => alert('Failed to move task.'));
+        }
+
+        function openTaskModal(columnId) {
+            const modal = document.getElementById('task-modal');
+            const input = document.getElementById('modal-column');
+            if (columnId) input.value = columnId;
+            else input.value = document.querySelector('.column')?.dataset.columnId || '';
+            modal.style.display = 'flex';
+        }
+
+        function closeTaskModal() {
+            document.getElementById('task-modal').style.display = 'none';
+        }
+
+        // Clicking outside the panel closes the modal
+        document.getElementById('task-modal').addEventListener('click', (e) => {
+            if (e.target.id === 'task-modal') closeTaskModal();
+        });
+    </script>
+{% endblock %}
