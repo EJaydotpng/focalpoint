@@ -112,25 +112,122 @@
         });
     }
 
+    function setTaskModal(mode) {
+        const editing = mode === 'edit';
+        document.getElementById('task-modal-title').textContent = editing ? 'Edit task' : 'Create task';
+        document.getElementById('task-submit').textContent = editing ? 'Save changes' : 'Create task';
+    }
+
+    function showTaskModal() {
+        document.getElementById('task-modal').style.display = 'flex';
+        document.getElementById('modal-title').focus();
+    }
+
     function openTaskModal(columnId) {
-        const modal = document.getElementById('task-modal');
-        const input = document.getElementById('modal-column');
-        if (columnId) {
-            input.value = columnId;
-        } else {
-            const firstColumn = document.querySelector('.column');
-            input.value = firstColumn ? firstColumn.dataset.columnId : '';
-        }
-        modal.style.display = 'flex';
+        const form = document.getElementById('task-form');
+        form.reset();
+        form.action = form.dataset.createAction;
+        const select = document.getElementById('modal-column');
+        const firstColumn = document.querySelector('.column');
+        select.value = columnId || (firstColumn ? firstColumn.dataset.columnId : '');
+        setTaskModal('create');
+        showTaskModal();
+    }
+
+    function openTaskEdit(card) {
+        const board = document.querySelector('.kanban');
+        const form = document.getElementById('task-form');
+        form.reset();
+        form.action = board.dataset.taskEditUrl.replace('/0/', `/${card.dataset.taskId}/`);
+        document.getElementById('modal-title').value = card.dataset.title;
+        document.getElementById('modal-desc').value = card.dataset.description;
+        document.getElementById('modal-priority').value = card.dataset.priority;
+        document.getElementById('modal-assignee').value = card.dataset.assignee;
+        document.getElementById('modal-column').value = card.closest('.column').dataset.columnId;
+        setTaskModal('edit');
+        showTaskModal();
     }
 
     function closeTaskModal() {
-        document.getElementById('task-modal').style.display = 'none';
+        const modal = document.getElementById('task-modal');
+        if (modal) modal.style.display = 'none';
     }
+
+    function openColumnModal(columnId) {
+        const form = document.getElementById('column-form');
+        const del = document.getElementById('column-delete');
+        const delForm = document.getElementById('column-delete-form');
+        form.reset();
+        // Drop a stray swatch added for a previous column's custom colour
+        form.querySelectorAll('.swatch--custom').forEach((el) => el.remove());
+
+        if (columnId) {
+            const board = document.querySelector('.kanban');
+            const column = document.querySelector(`.column[data-column-id="${columnId}"]`);
+            form.action = board.dataset.columnEditUrl.replace('/0/', `/${columnId}/`);
+            document.getElementById('column-name').value = column.dataset.columnName;
+
+            // Columns made before colour swatches existed may use a colour not in the palette
+            const color = column.dataset.columnColor;
+            let radio = Array.from(form.querySelectorAll('input[name="color"]')).find(
+                (r) => r.value.toLowerCase() === color.toLowerCase()
+            );
+            if (!radio) {
+                const label = document.createElement('label');
+                label.className = 'swatch swatch--custom';
+                label.title = 'Current color';
+                label.innerHTML = '<input type="radio" name="color"><span></span>';
+                radio = label.querySelector('input');
+                radio.value = color;
+                label.querySelector('span').style.backgroundColor = color;
+                form.querySelector('.swatches').prepend(label);
+            }
+            radio.checked = true;
+
+            delForm.action = board.dataset.columnDeleteUrl.replace('/0/', `/${columnId}/`);
+            const count = parseInt(column.dataset.taskCount, 10) || 0;
+            delForm.dataset.confirm = count
+                ? `Delete "${column.dataset.columnName}" and its ${count} task${count === 1 ? '' : 's'}?`
+                : `Delete "${column.dataset.columnName}"?`;
+            del.hidden = false;
+            document.getElementById('column-modal-title').textContent = 'Edit column';
+            document.getElementById('column-submit').textContent = 'Save changes';
+        } else {
+            form.action = form.dataset.createAction;
+            del.hidden = true;
+            document.getElementById('column-modal-title').textContent = 'Add column';
+            document.getElementById('column-submit').textContent = 'Add column';
+        }
+        document.getElementById('column-modal').style.display = 'flex';
+        document.getElementById('column-name').focus();
+    }
+
+    function closeColumnModal() {
+        const modal = document.getElementById('column-modal');
+        if (modal) modal.style.display = 'none';
+    }
+
+    // Confirm before a column (and its tasks) is deleted
+    const columnDeleteForm = document.getElementById('column-delete-form');
+    if (columnDeleteForm) {
+        columnDeleteForm.addEventListener('submit', (e) => {
+            if (!confirm(columnDeleteForm.dataset.confirm || 'Delete this column?')) e.preventDefault();
+        });
+    }
+
+    // Clicking a card (not its buttons) opens it for editing
+    document.addEventListener('click', (e) => {
+        const card = e.target.closest('.task-card');
+        if (!card || e.target.closest('button, form, a')) return;
+        openTaskEdit(card);
+    });
 
     // Expose for inline onclick handlers in templates
     window.openTaskModal = openTaskModal;
+    window.openTaskEdit = openTaskEdit;
     window.closeTaskModal = closeTaskModal;
+    window.openColumnModal = openColumnModal;
+    window.closeColumnModal = closeColumnModal;
 
     // Clicking outside the panel closes the modal
     const modal = document.getElementById('task-modal');
@@ -169,9 +266,11 @@
         if (scrim) scrim.addEventListener('click', () => app.classList.remove('sidebar-open'));
     }
 
-    // Escape closes the task modal
+    // Escape closes whichever dialog is open
     document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape' && document.getElementById('task-modal')) closeTaskModal();
+        if (e.key !== 'Escape') return;
+        closeTaskModal();
+        closeColumnModal();
     });
 
     // Wire up drag-and-drop once the DOM is ready

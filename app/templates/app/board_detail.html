@@ -4,10 +4,14 @@
 {% block page_title %}<a href="{% url 'board-list' %}" class="crumb">Boards</a><span class="crumb-sep">/</span>{{ board.name }}{% endblock %}
 
 {% block topbar_actions %}
-    <button type="button" class="btn btn--primary" onclick="openTaskModal()">Add task</button>
+    <button type="button" class="btn" onclick="openColumnModal()">Add column</button>
+    {% if columns %}
+        <button type="button" class="btn btn--primary" onclick="openTaskModal()">Add task</button>
+    {% endif %}
 {% endblock %}
 
 {% block toolbar %}
+    {% if columns %}
     <div class="toolbar">
         <label class="search">
             <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="9" cy="9" r="5"/><path d="m13 13 4 4"/></svg>
@@ -21,30 +25,47 @@
             <option value="critical">Critical</option>
         </select>
     </div>
+    {% endif %}
 {% endblock %}
 
 {% block content %}
-    <div class="kanban" data-task-update-url="{% url 'task-update' 0 %}">
+    {% if columns %}
+    <div class="kanban"
+         data-task-update-url="{% url 'task-update' 0 %}"
+         data-task-edit-url="{% url 'task-edit' 0 %}"
+         data-column-edit-url="{% url 'column-edit' 0 %}"
+         data-column-delete-url="{% url 'column-delete' 0 %}">
         {% for column in columns %}
-            <section class="column" data-column-id="{{ column.pk }}">
+            <section class="column" data-column-id="{{ column.pk }}" data-column-name="{{ column.name }}" data-column-color="{{ column.color }}" data-task-count="{{ column.tasks.count }}">
                 <div class="column-header">
                     <span class="stage-badge" style="background-color: {{ column.color }};">{{ column.name }}</span>
                     <span class="column-header__count">{{ column.tasks.count }}</span>
-                    <button type="button" class="icon-btn column-header__add" onclick="openTaskModal({{ column.pk }})" title="Add task to {{ column.name }}" aria-label="Add task to {{ column.name }}">
-                        <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 4v12M4 10h12"/></svg>
-                    </button>
+                    <span class="column-header__actions">
+                        <button type="button" class="icon-btn" onclick="openColumnModal({{ column.pk }})" title="Edit column" aria-label="Edit column {{ column.name }}">
+                            <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 16h3l8-8-3-3-8 8v3ZM11 6l3 3"/></svg>
+                        </button>
+                        <button type="button" class="icon-btn" onclick="openTaskModal({{ column.pk }})" title="Add task to {{ column.name }}" aria-label="Add task to {{ column.name }}">
+                            <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 4v12M4 10h12"/></svg>
+                        </button>
+                    </span>
                 </div>
                 <div class="column-body">
                     {% for task in column.tasks.all %}
-                        <article class="task-card draggable" data-task-id="{{ task.pk }}" data-priority="{{ task.priority }}">
+                        <article class="task-card draggable" data-task-id="{{ task.pk }}" data-priority="{{ task.priority }}"
+                                 data-title="{{ task.title }}" data-description="{{ task.description }}" data-assignee="{{ task.assignee_id|default_if_none:'' }}">
                             <div class="task-card__top">
                                 <h3 class="task-card__title">{{ task.title }}</h3>
-                                <form action="{% url 'task-delete' task.pk %}" method="post" onsubmit="return confirm('Delete this task?');">
-                                    {% csrf_token %}
-                                    <button type="submit" class="icon-btn task-card__delete" title="Delete task" aria-label="Delete task">
-                                        <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m5 5 10 10M15 5 5 15"/></svg>
+                                <span class="task-card__actions">
+                                    <button type="button" class="icon-btn task-card__btn" onclick="openTaskEdit(this.closest('.task-card'))" title="Edit task" aria-label="Edit task">
+                                        <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 16h3l8-8-3-3-8 8v3ZM11 6l3 3"/></svg>
                                     </button>
-                                </form>
+                                    <form action="{% url 'task-delete' task.pk %}" method="post" onsubmit="return confirm('Delete this task?');">
+                                        {% csrf_token %}
+                                        <button type="submit" class="icon-btn task-card__btn task-card__delete" title="Delete task" aria-label="Delete task">
+                                            <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m5 5 10 10M15 5 5 15"/></svg>
+                                        </button>
+                                    </form>
+                                </span>
                             </div>
                             {% if task.description %}
                                 <p class="task-card__desc">{{ task.description|truncatewords:15 }}</p>
@@ -67,12 +88,22 @@
                     {% endfor %}
                 </div>
             </section>
-        {% empty %}
-            <div class="empty-state">This board has no columns yet.</div>
         {% endfor %}
-    </div>
 
-    <!-- Task create modal -->
+        <button type="button" class="add-column" onclick="openColumnModal()">
+            <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 4v12M4 10h12"/></svg>
+            Add column
+        </button>
+    </div>
+    {% else %}
+        <div class="empty-state">
+            <p><strong>This board has no columns yet.</strong></p>
+            <p>Columns are the lanes your tasks move through, like "To do" or "Done". Add the first one to get started.</p>
+            <button type="button" class="btn btn--primary" onclick="openColumnModal()">Add your first column</button>
+        </div>
+    {% endif %}
+
+    <!-- Task modal (create + edit) -->
     <div id="task-modal" class="modal" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="task-modal-title">
         <div class="modal-backdrop" onclick="closeTaskModal()"></div>
         <div class="modal-panel">
@@ -82,16 +113,23 @@
                     <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m5 5 10 10M15 5 5 15"/></svg>
                 </button>
             </div>
-            <form id="task-form" method="post" action="{% url 'task-create' board.pk %}" class="modal-form">
+            <form id="task-form" method="post" action="{% url 'task-create' board.pk %}" data-create-action="{% url 'task-create' board.pk %}" class="modal-form">
                 {% csrf_token %}
-                <input type="hidden" name="column" id="modal-column">
                 <div class="form-field">
                     <label for="modal-title">Title</label>
-                    <input type="text" id="modal-title" name="title" maxlength="200" required autofocus>
+                    <input type="text" id="modal-title" name="title" maxlength="200" required>
                 </div>
                 <div class="form-field">
                     <label for="modal-desc">Description</label>
                     <textarea id="modal-desc" name="description" rows="3"></textarea>
+                </div>
+                <div class="form-field">
+                    <label for="modal-column">Column</label>
+                    <select id="modal-column" name="column">
+                        {% for column in columns %}
+                            <option value="{{ column.pk }}">{{ column.name }}</option>
+                        {% endfor %}
+                    </select>
                 </div>
                 <div class="form-row">
                     <div class="form-field">
@@ -115,9 +153,48 @@
                 </div>
                 <div class="form-actions form-actions--end">
                     <button type="button" class="btn" onclick="closeTaskModal()">Cancel</button>
-                    <button type="submit" class="btn btn--primary">Create task</button>
+                    <button type="submit" class="btn btn--primary" id="task-submit">Create task</button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <!-- Column modal (create + edit) -->
+    <div id="column-modal" class="modal" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="column-modal-title">
+        <div class="modal-backdrop" onclick="closeColumnModal()"></div>
+        <div class="modal-panel modal-panel--small">
+            <div class="modal-header">
+                <h3 id="column-modal-title">Add column</h3>
+                <button type="button" class="icon-btn" onclick="closeColumnModal()" aria-label="Close">
+                    <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m5 5 10 10M15 5 5 15"/></svg>
+                </button>
+            </div>
+            <form id="column-form" method="post" action="{% url 'column-create' board.pk %}" data-create-action="{% url 'column-create' board.pk %}" class="modal-form">
+                {% csrf_token %}
+                <div class="form-field">
+                    <label for="column-name">Name</label>
+                    <input type="text" id="column-name" name="name" maxlength="100" required placeholder="e.g. In review">
+                </div>
+                <div class="form-field">
+                    <span class="field-label" id="color-label">Color</span>
+                    <div class="swatches" role="radiogroup" aria-labelledby="color-label">
+                        {% for hex, label in swatches %}
+                            <label class="swatch" title="{{ label }}">
+                                <input type="radio" name="color" value="{{ hex }}"{% if forloop.first %} checked{% endif %}>
+                                <span style="background-color: {{ hex }};"></span>
+                            </label>
+                        {% endfor %}
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="submit" form="column-delete-form" class="btn btn--danger" id="column-delete" hidden>Delete column</button>
+                    <div class="form-actions form-actions--end">
+                        <button type="button" class="btn" onclick="closeColumnModal()">Cancel</button>
+                        <button type="submit" class="btn btn--primary" id="column-submit">Add column</button>
+                    </div>
+                </div>
+            </form>
+            <form id="column-delete-form" method="post" action="" hidden>{% csrf_token %}</form>
         </div>
     </div>
 {% endblock %}
