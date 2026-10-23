@@ -4,6 +4,7 @@
 {% block page_title %}<a href="{% url 'board-list' %}" class="crumb">Boards</a><span class="crumb-sep">/</span>{{ board.name }}{% endblock %}
 
 {% block topbar_actions %}
+    <button type="button" class="btn" onclick="openCategoryModal()">Categories</button>
     <button type="button" class="btn" onclick="openColumnModal()">Add column</button>
     {% if columns %}
         <button type="button" class="btn btn--primary" onclick="openTaskModal()">Add task</button>
@@ -24,6 +25,14 @@
             <option value="high">High</option>
             <option value="critical">Critical</option>
         </select>
+        {% if categories %}
+        <select id="category-filter" class="select" aria-label="Filter by category">
+            <option value="">All categories</option>
+            {% for c in categories %}
+                <option value="{{ c.pk }}">{{ c.name }}</option>
+            {% endfor %}
+        </select>
+        {% endif %}
     </div>
     {% endif %}
 {% endblock %}
@@ -52,7 +61,9 @@
                 <div class="column-body">
                     {% for task in column.tasks.all %}
                         <article class="task-card draggable" data-task-id="{{ task.pk }}" data-priority="{{ task.priority }}"
-                                 data-title="{{ task.title }}" data-description="{{ task.description }}" data-assignee="{{ task.assignee_id|default_if_none:'' }}">
+                                 data-title="{{ task.title }}" data-description="{{ task.description }}" data-assignee="{{ task.assignee_id|default_if_none:'' }}"
+                                 data-category="{{ task.category_id|default_if_none:'' }}" data-ticket="{{ board.prefix }}-{{ task.number }}">
+                            <div class="task-card__id">{{ board.prefix }}-{{ task.number }}</div>
                             <div class="task-card__top">
                                 <h3 class="task-card__title">{{ task.title }}</h3>
                                 <span class="task-card__actions">
@@ -78,13 +89,18 @@
                                 {% endif %}
                                 <span>{{ task.created_at|date:"M j, Y" }}</span>
                             </div>
-                            <span class="tag tag--{{ task.priority }}">
-                                <span class="bars" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
-                                {{ task.get_priority_display }}
-                            </span>
+                            <div class="task-card__tags">
+                                <span class="tag tag--{{ task.priority }}">
+                                    <span class="bars" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+                                    {{ task.get_priority_display }}
+                                </span>
+                                {% if task.category %}
+                                    <span class="chip" style="background-color: {{ task.category.color }};">{{ task.category.name }}</span>
+                                {% endif %}
+                            </div>
                         </article>
                     {% empty %}
-                        <div class="empty-col">No tasks</div>
+                        <!-- <div class="empty-col">No tasks</div> -->
                     {% endfor %}
                 </div>
             </section>
@@ -131,6 +147,16 @@
                         {% endfor %}
                     </select>
                 </div>
+                <div class="form-field">
+                    <label for="modal-category">Category</label>
+                    <select id="modal-category" name="category">
+                        <option value="">No category</option>
+                        {% for c in categories %}
+                            <option value="{{ c.pk }}">{{ c.name }}</option>
+                        {% endfor %}
+                    </select>
+                    <button type="button" class="link-btn" onclick="closeTaskModal(); openCategoryModal();">Manage categories</button>
+                </div>
                 <div class="form-row">
                     <div class="form-field">
                         <label for="modal-priority">Priority</label>
@@ -156,6 +182,67 @@
                     <button type="submit" class="btn btn--primary" id="task-submit">Create task</button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <!-- Category modal (list + create + edit) -->
+    <div id="category-modal" class="modal" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="category-modal-title"
+         data-edit-url="{% url 'category-edit' 0 %}">
+        <div class="modal-backdrop" onclick="closeCategoryModal()"></div>
+        <div class="modal-panel modal-panel--small">
+            <div class="modal-header">
+                <h3 id="category-modal-title">Categories</h3>
+                <button type="button" class="icon-btn" onclick="closeCategoryModal()" aria-label="Close">
+                    <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m5 5 10 10M15 5 5 15"/></svg>
+                </button>
+            </div>
+            <div class="modal-form">
+                {% if categories %}
+                <ul class="category-list">
+                    {% for c in categories %}
+                        <li class="category-row" data-category-id="{{ c.pk }}" data-name="{{ c.name }}" data-color="{{ c.color }}">
+                            <span class="chip" style="background-color: {{ c.color }};">{{ c.name }}</span>
+                            <span class="category-row__count">{{ c.tasks.count }} task{{ c.tasks.count|pluralize }}</span>
+                            <button type="button" class="icon-btn" onclick="editCategory(this.closest('.category-row'))" title="Edit category" aria-label="Edit {{ c.name }}">
+                                <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 16h3l8-8-3-3-8 8v3ZM11 6l3 3"/></svg>
+                            </button>
+                            <form action="{% url 'category-delete' c.pk %}" method="post" onsubmit="return confirm('Delete the category &quot;{{ c.name|escapejs }}&quot;? Its tasks will stay, just without a category.');">
+                                {% csrf_token %}
+                                <button type="submit" class="icon-btn icon-btn--danger" title="Delete category" aria-label="Delete {{ c.name }}">
+                                    <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m5 5 10 10M15 5 5 15"/></svg>
+                                </button>
+                            </form>
+                        </li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                    <p class="muted category-empty">No categories yet. Make your own, like "Bug", "Design" or "Research".</p>
+                {% endif %}
+
+                <form id="category-form" method="post" action="{% url 'category-create' board.pk %}" data-create-action="{% url 'category-create' board.pk %}" class="category-form">
+                    {% csrf_token %}
+                    <h4 class="category-form__title" id="category-form-title">New category</h4>
+                    <div class="form-field">
+                        <label for="category-name">Name</label>
+                        <input type="text" id="category-name" name="name" maxlength="50" required placeholder="e.g. Bug">
+                    </div>
+                    <div class="form-field">
+                        <span class="field-label" id="category-color-label">Color</span>
+                        <div class="swatches" role="radiogroup" aria-labelledby="category-color-label">
+                            {% for hex, label in swatches %}
+                                <label class="swatch" title="{{ label }}">
+                                    <input type="radio" name="color" value="{{ hex }}"{% if forloop.first %} checked{% endif %}>
+                                    <span style="background-color: {{ hex }};"></span>
+                                </label>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    <div class="form-actions form-actions--end">
+                        <button type="button" class="btn" id="category-cancel-edit" hidden onclick="resetCategoryForm()">Cancel edit</button>
+                        <button type="submit" class="btn btn--primary" id="category-submit">Add category</button>
+                    </div>
+                </form>
+            </div>
         </div>
     </div>
 

@@ -13,4 +13,7 @@ urlpatterns = [
     path('<int:board_pk>/columns/create/', views.column_create, name='column-create'),
     path('columns/<int:pk>/edit/', views.column_edit, name='column-edit'),
     path('columns/<int:pk>/delete/', views.column_delete, name='column-delete'),
+    path('<int:board_pk>/categories/create/', views.category_create, name='category-create'),
+    path('categories/<int:pk>/edit/', views.category_edit, name='category-edit'),
+    path('categories/<int:pk>/delete/', views.category_delete, name='category-delete'),
 ]

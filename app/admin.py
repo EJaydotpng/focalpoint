@@ -1,11 +1,11 @@
 from django.contrib import admin
 
-from .models import Board, Column, Task
+from .models import Board, Category, Column, Task
 
 
 @admin.register(Board)
 class BoardAdmin(admin.ModelAdmin):
-    list_display = ('name', 'owner', 'created_at')
+    list_display = ('name', 'prefix', 'owner', 'created_at')
     list_filter = ('owner',)
     search_fields = ('name',)
 
@@ -17,8 +17,15 @@ class ColumnAdmin(admin.ModelAdmin):
     search_fields = ('name',)
 
 
+@admin.register(Category)
+class CategoryAdmin(admin.ModelAdmin):
+    list_display = ('name', 'board', 'color')
+    list_filter = ('board',)
+    search_fields = ('name',)
+
+
 @admin.register(Task)
 class TaskAdmin(admin.ModelAdmin):
-    list_display = ('title', 'board', 'column', 'priority', 'assignee', 'created_at')
-    list_filter = ('board', 'column', 'priority', 'assignee')
+    list_display = ('ticket_id', 'title', 'board', 'column', 'category', 'priority', 'assignee', 'created_at')
+    list_filter = ('board', 'column', 'category', 'priority', 'assignee')
     search_fields = ('title', 'description')

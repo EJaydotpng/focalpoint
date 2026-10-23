@@ -17,6 +17,11 @@
                 <label for="name">Board name</label>
                 <input type="text" id="name" name="name" maxlength="200" required autofocus placeholder="e.g. Sprint 1">
             </div>
+            <div class="form-field">
+                <label for="prefix">Ticket prefix <span class="optional">(optional)</span></label>
+                <input type="text" id="prefix" name="prefix" maxlength="6" placeholder="e.g. FP" autocomplete="off">
+                <p class="field-hint">Tasks get IDs like FP-1, FP-2. Leave blank to use the board's initials.</p>
+            </div>
             <div class="form-actions">
                 <button type="submit" class="btn btn--primary">Create board</button>
                 <a href="{% url 'board-list' %}" class="btn">Cancel</a>

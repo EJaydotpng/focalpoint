@@ -112,9 +112,9 @@
         });
     }
 
-    function setTaskModal(mode) {
+    function setTaskModal(mode, ticket) {
         const editing = mode === 'edit';
-        document.getElementById('task-modal-title').textContent = editing ? 'Edit task' : 'Create task';
+        document.getElementById('task-modal-title').textContent = editing ? `Edit ${ticket}` : 'Create task';
         document.getElementById('task-submit').textContent = editing ? 'Save changes' : 'Create task';
     }
 
@@ -144,13 +144,65 @@
         document.getElementById('modal-priority').value = card.dataset.priority;
         document.getElementById('modal-assignee').value = card.dataset.assignee;
         document.getElementById('modal-column').value = card.closest('.column').dataset.columnId;
-        setTaskModal('edit');
+        document.getElementById('modal-category').value = card.dataset.category;
+        setTaskModal('edit', card.dataset.ticket);
         showTaskModal();
     }
 
     function closeTaskModal() {
         const modal = document.getElementById('task-modal');
         if (modal) modal.style.display = 'none';
+    }
+
+    // ----- Categories -----
+    function resetCategoryForm() {
+        const form = document.getElementById('category-form');
+        form.reset();
+        form.querySelectorAll('.swatch--custom').forEach((el) => el.remove());
+        form.action = form.dataset.createAction;
+        document.getElementById('category-form-title').textContent = 'New category';
+        document.getElementById('category-submit').textContent = 'Add category';
+        document.getElementById('category-cancel-edit').hidden = true;
+    }
+
+    function openCategoryModal() {
+        resetCategoryForm();
+        document.getElementById('category-modal').style.display = 'flex';
+        document.getElementById('category-name').focus();
+    }
+
+    function closeCategoryModal() {
+        const modal = document.getElementById('category-modal');
+        if (modal) modal.style.display = 'none';
+    }
+
+    function editCategory(row) {
+        const modal = document.getElementById('category-modal');
+        const form = document.getElementById('category-form');
+        resetCategoryForm();
+        form.action = modal.dataset.editUrl.replace('/0/', `/${row.dataset.categoryId}/`);
+        document.getElementById('category-name').value = row.dataset.name;
+
+        const color = row.dataset.color;
+        let radio = Array.from(form.querySelectorAll('input[name="color"]')).find(
+            (r) => r.value.toLowerCase() === color.toLowerCase()
+        );
+        if (!radio) {
+            const label = document.createElement('label');
+            label.className = 'swatch swatch--custom';
+            label.title = 'Current color';
+            label.innerHTML = '<input type="radio" name="color"><span></span>';
+            radio = label.querySelector('input');
+            radio.value = color;
+            label.querySelector('span').style.backgroundColor = color;
+            form.querySelector('.swatches').prepend(label);
+        }
+        radio.checked = true;
+
+        document.getElementById('category-form-title').textContent = 'Edit category';
+        document.getElementById('category-submit').textContent = 'Save changes';
+        document.getElementById('category-cancel-edit').hidden = false;
+        document.getElementById('category-name').focus();
     }
 
     function openColumnModal(columnId) {
@@ -226,6 +278,10 @@
     window.openTaskModal = openTaskModal;
     window.openTaskEdit = openTaskEdit;
     window.closeTaskModal = closeTaskModal;
+    window.openCategoryModal = openCategoryModal;
+    window.closeCategoryModal = closeCategoryModal;
+    window.editCategory = editCategory;
+    window.resetCategoryForm = resetCategoryForm;
     window.openColumnModal = openColumnModal;
     window.closeColumnModal = closeColumnModal;
 
@@ -241,19 +297,23 @@
     function setupFilters() {
         const search = document.getElementById('task-search');
         const priority = document.getElementById('priority-filter');
+        const category = document.getElementById('category-filter');
         if (!search || !priority) return;
 
         function apply() {
             const q = search.value.trim().toLowerCase();
             const p = priority.value;
+            const c = category ? category.value : '';
             document.querySelectorAll('.task-card').forEach((card) => {
                 const matchesText = !q || card.textContent.toLowerCase().includes(q);
                 const matchesPriority = !p || card.dataset.priority === p;
-                card.hidden = !(matchesText && matchesPriority);
+                const matchesCategory = !c || card.dataset.category === c;
+                card.hidden = !(matchesText && matchesPriority && matchesCategory);
             });
         }
         search.addEventListener('input', apply);
         priority.addEventListener('change', apply);
+        if (category) category.addEventListener('change', apply);
     }
 
     // Sidebar toggle on narrow screens
@@ -271,6 +331,7 @@
         if (e.key !== 'Escape') return;
         closeTaskModal();
         closeColumnModal();
+        closeCategoryModal();
     });
 
     // Wire up drag-and-drop once the DOM is ready
