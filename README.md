@@ -1,2 +1,2 @@
-# Ledger
-Simple Money Manager
+# Focal Point
+Simple Task Manager inspired by Jira
