@@ -62,7 +62,10 @@
                     {% for task in column.tasks.all %}
                         <article class="task-card draggable" data-task-id="{{ task.pk }}" data-priority="{{ task.priority }}"
                                  data-title="{{ task.title }}" data-description="{{ task.description }}" data-assignee="{{ task.assignee_id|default_if_none:'' }}"
-                                 data-category="{{ task.category_id|default_if_none:'' }}" data-ticket="{{ board.prefix }}-{{ task.number }}">
+                                 data-category="{{ task.category_id|default_if_none:'' }}" data-ticket="{{ board.prefix }}-{{ task.number }}"
+                                 data-priority-label="{{ task.get_priority_display }}" data-created="{{ task.created_at|date:'M j, Y' }}"
+                                 data-assignee-name="{{ task.assignee.username|default:'' }}"
+                                 data-category-name="{{ task.category.name|default:'' }}" data-category-color="{{ task.category.color|default:'' }}">
                             <div class="task-card__id">{{ board.prefix }}-{{ task.number }}</div>
                             <div class="task-card__top">
                                 <h3 class="task-card__title">{{ task.title }}</h3>
@@ -118,6 +121,35 @@
             <button type="button" class="btn btn--primary" onclick="openColumnModal()">Add your first column</button>
         </div>
     {% endif %}
+
+    <!-- Task view modal (read-only, with an Edit button) -->
+    <div id="view-modal" class="modal" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="view-title">
+        <div class="modal-backdrop" onclick="closeTaskView()"></div>
+        <div class="modal-panel">
+            <div class="modal-header">
+                <span class="view-ticket" id="view-ticket"></span>
+                <button type="button" class="icon-btn" onclick="closeTaskView()" aria-label="Close">
+                    <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m5 5 10 10M15 5 5 15"/></svg>
+                </button>
+            </div>
+            <div class="modal-form">
+                <h2 class="view-title" id="view-title"></h2>
+                <dl class="view-meta">
+                    <dt>Status</dt><dd id="view-status"></dd>
+                    <dt>Priority</dt><dd id="view-priority"></dd>
+                    <dt>Category</dt><dd id="view-category"></dd>
+                    <dt>Assignee</dt><dd id="view-assignee"></dd>
+                    <dt>Created</dt><dd id="view-created"></dd>
+                </dl>
+                <h4 class="view-heading">Description</h4>
+                <p class="view-desc" id="view-desc"></p>
+                <div class="form-actions form-actions--end">
+                    <button type="button" class="btn" onclick="closeTaskView()">Close</button>
+                    <button type="button" class="btn btn--primary" id="view-edit">Edit task</button>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <!-- Task modal (create + edit) -->
     <div id="task-modal" class="modal" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="task-modal-title">

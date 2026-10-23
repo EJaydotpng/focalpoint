@@ -706,6 +706,42 @@ svg {
 .category-form__title { margin: 0 0 12px; font-size: 14px; font-weight: 600; }
 .category-list + .category-form { border-top: 0; }
 
+/* Task view dialog */
+.view-ticket { font-size: 13px; font-weight: 500; color: var(--text-muted); }
+
+.view-title {
+    margin: 0 0 16px;
+    font-size: 18px;
+    font-weight: 600;
+    line-height: 1.35;
+    overflow-wrap: anywhere;
+}
+
+.view-meta {
+    display: grid;
+    grid-template-columns: 96px minmax(0, 1fr);
+    align-items: center;
+    gap: 10px 12px;
+    margin: 0 0 20px;
+}
+
+.view-meta dt { font-size: 13px; color: var(--text-muted); }
+.view-meta dd { display: flex; align-items: center; gap: 8px; margin: 0; min-width: 0; }
+.view-meta dd.is-empty { color: var(--text-muted); }
+
+.view-heading { margin: 0 0 6px; font-size: 13px; font-weight: 500; color: var(--text-muted); }
+
+.view-desc {
+    margin: 0 0 20px;
+    max-height: 240px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    line-height: 1.55;
+}
+
+.view-desc.is-empty { color: var(--text-muted); }
+
 /* Dialog extras */
 .modal-panel--small { max-width: 400px; }
 

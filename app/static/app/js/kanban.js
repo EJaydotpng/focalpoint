@@ -267,16 +267,97 @@
         });
     }
 
-    // Clicking a card (not its buttons) opens it for editing
+    // ----- Task view (read-only) -----
+    let viewedCard = null;
+
+    function openTaskView(card) {
+        viewedCard = card;
+        const column = card.closest('.column');
+        const d = card.dataset;
+
+        document.getElementById('view-ticket').textContent = d.ticket;
+        document.getElementById('view-title').textContent = d.title;
+
+        const status = document.getElementById('view-status');
+        status.textContent = '';
+        const badge = document.createElement('span');
+        badge.className = 'stage-badge';
+        badge.textContent = column.dataset.columnName;
+        badge.style.backgroundColor = column.dataset.columnColor;
+        status.appendChild(badge);
+
+        const priority = document.getElementById('view-priority');
+        priority.textContent = '';
+        const tag = document.createElement('span');
+        tag.className = `tag tag--${d.priority}`;
+        tag.innerHTML = '<span class="bars" aria-hidden="true"><i></i><i></i><i></i><i></i></span>';
+        tag.appendChild(document.createTextNode(d.priorityLabel));
+        priority.appendChild(tag);
+
+        const category = document.getElementById('view-category');
+        category.textContent = '';
+        if (d.categoryName) {
+            const chip = document.createElement('span');
+            chip.className = 'chip';
+            chip.textContent = d.categoryName;
+            chip.style.backgroundColor = d.categoryColor;
+            category.appendChild(chip);
+        } else {
+            category.textContent = 'None';
+            category.classList.add('is-empty');
+        }
+        category.classList.toggle('is-empty', !d.categoryName);
+
+        const assignee = document.getElementById('view-assignee');
+        assignee.textContent = '';
+        assignee.classList.toggle('is-empty', !d.assigneeName);
+        if (d.assigneeName) {
+            const avatar = document.createElement('span');
+            avatar.className = 'avatar avatar--sm';
+            avatar.textContent = d.assigneeName.charAt(0).toUpperCase();
+            assignee.appendChild(avatar);
+            assignee.appendChild(document.createTextNode(d.assigneeName));
+        } else {
+            assignee.textContent = 'Unassigned';
+        }
+
+        document.getElementById('view-created').textContent = d.created;
+
+        const desc = document.getElementById('view-desc');
+        desc.textContent = d.description || 'No description';
+        desc.classList.toggle('is-empty', !d.description);
+
+        document.getElementById('view-modal').style.display = 'flex';
+        document.getElementById('view-edit').focus();
+    }
+
+    function closeTaskView() {
+        const modal = document.getElementById('view-modal');
+        if (modal) modal.style.display = 'none';
+        viewedCard = null;
+    }
+
+    const viewEdit = document.getElementById('view-edit');
+    if (viewEdit) {
+        viewEdit.addEventListener('click', () => {
+            const card = viewedCard;
+            closeTaskView();
+            if (card) openTaskEdit(card);
+        });
+    }
+
+    // Clicking a card (not its buttons) opens the read-only view
     document.addEventListener('click', (e) => {
         const card = e.target.closest('.task-card');
         if (!card || e.target.closest('button, form, a')) return;
-        openTaskEdit(card);
+        openTaskView(card);
     });
 
     // Expose for inline onclick handlers in templates
     window.openTaskModal = openTaskModal;
     window.openTaskEdit = openTaskEdit;
+    window.openTaskView = openTaskView;
+    window.closeTaskView = closeTaskView;
     window.closeTaskModal = closeTaskModal;
     window.openCategoryModal = openCategoryModal;
     window.closeCategoryModal = closeCategoryModal;
@@ -329,6 +410,7 @@
     // Escape closes whichever dialog is open
     document.addEventListener('keydown', (e) => {
         if (e.key !== 'Escape') return;
+        closeTaskView();
         closeTaskModal();
         closeColumnModal();
         closeCategoryModal();
